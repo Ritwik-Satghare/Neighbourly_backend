@@ -1,94 +1,204 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Head from "next/head";
-import { FiSearch, FiMapPin, FiFilter } from "react-icons/fi";
-import PageHeader from '../../components/pageHeader'; 
+import {
+  FiSearch, FiMapPin, FiFilter,
+  FiMessageSquare, FiBell, FiPlus, FiHome,
+} from "react-icons/fi";
+import PageHeader from "../../components/pageHeader";
+
+interface Item {
+  id: number;
+  name: string;
+  price: number;
+  dist: string;
+  area: string;
+  img: string;
+}
+
+interface LocationInfo {
+  label: string;
+  fullAddr: string;
+}
+
+async function reverseGeocode(lat: number, lon: number): Promise<LocationInfo> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+    );
+    const data = await res.json();
+    const addr = data.address || {};
+    const label = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city || "Home";
+    const postcode = addr.postcode || "";
+    const city = addr.city || addr.town || addr.state_district || "";
+    const houseNo = addr.house_number ? addr.house_number + " " : "";
+    const road = addr.road || "";
+    const fullAddr = `${houseNo}${road}${road ? ", " : ""}${label}${city && city !== label ? ", " + city : ""}${postcode ? " " + postcode : ""}`;
+    return { label, fullAddr };
+  } catch {
+    return { label: "Home", fullAddr: "Mumbai, Maharashtra" };
+  }
+}
 
 const Wireframe5: React.FC = () => {
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<Item[]>([]);
+  const [activeNav, setActiveNav] = useState("home");
+  const [location, setLocation] = useState<LocationInfo>({
+    label: "Home",
+    fullAddr: "Fetching location…",
+  });
+  const [desktopSearch, setDesktopSearch] = useState("");
+  const [desktopLocation, setDesktopLocation] = useState("");
 
   useEffect(() => {
-    // Simulated API call for recommendations
+    if (!navigator.geolocation) {
+      setLocation({ label: "Mumbai", fullAddr: "Bandra West, Mumbai 400050" });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const info = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        setLocation(info);
+        setDesktopLocation(info.fullAddr);
+      },
+      () => {
+        setLocation({ label: "Mumbai", fullAddr: "Bandra West, Mumbai 400050" });
+        setDesktopLocation("Bandra West, Mumbai 400050");
+      }
+    );
+  }, []);
+
+  useEffect(() => {
     setRecommendations([
-      { id: 1, name: "Polished Chair", price: 400, img: "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=800" },
-      { id: 2, name: "Polished Chair", price: 400, img: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=800" },
-      { id: 3, name: "Polished Chair", price: 400, img: "https://images.unsplash.com/photo-1503602642458-232111445657?w=800" },
+      { id: 1, name: "Polished Chair", price: 400, dist: "1.5 km away", area: "Andheri West", img: "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=400" },
+      { id: 2, name: "Wooden Chair",   price: 350, dist: "2.1 km away", area: "Bandra East",  img: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400" },
+      { id: 3, name: "Lounge Chair",   price: 500, dist: "3.0 km away", area: "Juhu",         img: "https://images.unsplash.com/photo-1503602642458-232111445657?w=400" },
     ]);
   }, []);
 
+  const navItems = [
+    { id: "home",     Icon: FiHome,          label: "Home" },
+    { id: "bell",     Icon: FiBell,          label: "Alerts" },
+    { id: "messages", Icon: FiMessageSquare, label: "Messages" },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#FBFBFF] no-scrollbar overflow-y-auto relative font-sans text-[#1A1A1A]">
-      <Head>
-        <title>Proximi | Explore</title>
-      </Head>
+    <div className="relative min-h-screen font-sans">
+      <Head><title>Proximi | Explore</title></Head>
 
-      {/* 1. ADD YOUR HEADER COMPONENT HERE */}
-      <PageHeader />
+      {/* ── DESKTOP ── */}
+      <div
+        className="hidden md:block"
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(180deg, #7F86EC, #9CA5E8)",
+          position: "relative",
+        }}
+      >
+        {/* Same fixed blobs as previous pages */}
+        <div
+          style={{
+            position: "fixed",
+            width: "380px",
+            height: "380px",
+            background: "#5F6EE5",
+            borderRadius: "50%",
+            bottom: "-140px",
+            left: "-140px",
+            opacity: 0.5,
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
+        <div
+          style={{
+            position: "fixed",
+            width: "420px",
+            height: "300px",
+            background: "#C6CEF5",
+            borderRadius: "60% 40% 60% 40%",
+            top: "-100px",
+            right: "-100px",
+            opacity: 0.7,
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
 
-      {/* --- ORIGINAL WAVE COLOR PATTERN --- */}
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <svg className="absolute top-0 left-0 w-[65%] h-full opacity-100" viewBox="0 0 500 1000" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#A78BFA" />
-              <stop offset="100%" stopColor="#6366F1" />
-            </linearGradient>
-          </defs>
-          <path d="M0,0 L280,0 C420,200 280,450 480,700 C440,880 300,920 380,1000 L0,1000 Z" fill="url(#waveGrad)" />
-        </svg>
-        
-        {/* Subtle secondary wave for depth */}
-        <div className="absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] bg-[#8B8CF7]/10 rounded-full blur-[120px]" />
-      </div>
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+            WebkitBackdropFilter: "blur(16px)",
+          }}
+        >
+          <PageHeader />
+        </div>
 
-      <main className="max-w-7xl mx-auto px-6 md:px-10 pt-16 md:pt-24">
-        
-        {/* SECTION 1: HERO TEXT & SEARCH (Merged as per request) */}
-        <section className="mb-24 flex flex-col items-start">
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-8 max-w-2xl leading-[1.1] tracking-tight">
-            Rent Items From People Nearby
+        {/* Hero */}
+        <section className="relative z-10 max-w-5xl mx-auto px-8 pt-16 pb-24">
+          <h1
+            className="text-4xl font-black text-gray-900 leading-tight mb-10"
+            style={{ maxWidth: "340px" }}
+          >
+            Rent Items From<br />People Nearby
           </h1>
-          <pre className="font-extrabold mb-8 max-w-2xl leading-[1.1] tracking-tight">
-            Find unique items for rent with 
-            safety and reliability.
-          </pre>
 
-          <div className="flex items-center bg-white rounded-full p-2 shadow-[0_20px_50px_-15px_rgba(99,102,241,0.15)] border border-white w-full max-w-3xl group transition-all hover:shadow-[0_25px_60px_-15px_rgba(99,102,241,0.2)]">
-            <div className="flex items-center flex-1 px-5 gap-4">
-              <FiSearch className="text-[#8B8CF7] text-2xl" />
-              <input 
-                type="text" 
-                placeholder="Search items near you" 
-                className="w-full bg-transparent outline-none py-4 text-lg font-medium placeholder:text-gray-400" 
+          {/* Search bar */}
+          <div
+            className="flex items-center gap-0 bg-white rounded-full shadow-lg overflow-hidden"
+            style={{ maxWidth: "480px" }}
+          >
+            <div className="flex items-center gap-2 px-4 py-3 flex-1 border-r border-gray-100">
+              <FiSearch className="text-gray-400 text-[16px] shrink-0" />
+              <input
+                type="text"
+                value={desktopSearch}
+                onChange={(e) => setDesktopSearch(e.target.value)}
+                placeholder="Search items..."
+                className="bg-transparent outline-none text-sm text-gray-700 placeholder:text-gray-400 w-full"
               />
             </div>
-            <button className="bg-gradient-to-r from-[#8B8CF7] to-[#6366F1] text-white px-10 py-4 rounded-full font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all">
-              <span className="hidden md:inline">Search</span>
-              <FiFilter className="md:hidden text-2xl" />
+            <div className="flex items-center gap-2 px-4 py-3 flex-1">
+              <FiMapPin className="text-gray-400 text-[16px] shrink-0" />
+              <input
+                type="text"
+                value={desktopLocation}
+                onChange={(e) => setDesktopLocation(e.target.value)}
+                placeholder="Location"
+                className="bg-transparent outline-none text-sm text-gray-700 placeholder:text-gray-400 w-full"
+              />
+            </div>
+            <button
+              className="px-6 py-3 text-white text-sm font-bold rounded-full m-1 shrink-0"
+              style={{ background: "linear-gradient(135deg,#8B8CF7,#6366F1)" }}
+            >
+              Search
             </button>
           </div>
         </section>
 
-        {/* SECTION 2: RECOMMENDED (Large Cards) */}
-        <section className="mb-32">
-          <h2 className="text-2xl md:text-3xl font-bold mb-12 tracking-tight">Recommended for you</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-14">
+        {/* Recommended section — white/glass card over the same gradient */}
+        <section className="relative z-10 max-w-5xl mx-auto px-8 pb-16">
+          <h2 className="text-2xl font-black text-gray-900 mb-6">Recommended for you</h2>
+          <div className="grid grid-cols-3 gap-6">
             {recommendations.map((item) => (
-              <div key={item.id} className="bg-white rounded-[50px] p-6 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.04)] border border-gray-50 flex flex-row md:flex-col gap-8 transition-all hover:-translate-y-2 hover:shadow-2xl">
-                {/* Increased Image Size */}
-                <div className="w-40 h-40 md:w-full md:h-80 bg-[#F9FAFB] rounded-[40px] overflow-hidden flex items-center justify-center shrink-0">
+              <div
+                key={item.id}
+                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 cursor-pointer"
+              >
+                <div className="w-full bg-gray-50" style={{ height: "190px" }}>
                   <img src={item.img} alt={item.name} className="w-full h-full object-cover" />
                 </div>
-                {/* Text Content */}
-                <div className="flex flex-col justify-center gap-2">
-                  <h3 className="text-2xl font-bold">{item.name}</h3>
-                  <div className="flex flex-col">
-                    <span className="text-[#6366F1] font-black text-2xl">₹{item.price} / day</span>
-                    <span className="text-gray-400 font-semibold mt-1">1.5 km away</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-gray-400 text-sm mt-2">
-                    <FiMapPin className="text-[#8B8CF7]" />
-                    <span>Andheri West</span>
+                <div className="px-4 py-3">
+                  <p className="font-extrabold text-gray-900 text-[15px]">{item.name}</p>
+                  <p className="text-gray-700 font-semibold text-sm mt-0.5">₹{item.price} / day</p>
+                  <p className="text-gray-400 text-xs mt-0.5">{item.dist}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <FiMapPin className="text-gray-400 text-[11px]" />
+                    <span className="text-gray-400 text-xs">{item.area}</span>
                   </div>
                 </div>
               </div>
@@ -96,27 +206,114 @@ const Wireframe5: React.FC = () => {
           </div>
         </section>
 
-        {/* SECTION 3: WHY TRUST US + 3 CONTAINERS */}
-        <section className="pb-40">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold tracking-tight">Why Trust US</h2>
+        {/* Why Trust Us — same gradient continues, just a centered heading */}
+        <section className="relative z-10 max-w-5xl mx-auto px-8 py-24 flex items-center justify-center">
+          <h2 className="text-3xl font-black text-gray-900">Why Trust US</h2>
+        </section>
+      </div>
+
+      {/* ── MOBILE (completely unchanged) ── */}
+      <div className="flex flex-col min-h-screen md:hidden" style={{ background: "#f0f2f8" }}>
+
+        {/* STICKY TOP HEADER */}
+        <div
+          className="sticky top-0 z-50 rounded-b-[28px] px-[18px] pt-[28px] pb-10 shadow-lg"
+          style={{ background: "linear-gradient(160deg,#7F86EC 0%,#9CA5E8 100%)" }}
+        >
+          <div className="flex items-start gap-3 mb-3">
+            <button className="mt-1 flex flex-col gap-[5px]">
+              <span className="block w-[22px] h-[2.5px] bg-white rounded-full" />
+              <span className="block w-[22px] h-[2.5px] bg-white rounded-full" />
+              <span className="block w-[22px] h-[2.5px] bg-white rounded-full" />
+            </button>
+            <div>
+              <div className="flex items-center gap-1">
+                <FiMapPin className="text-[#FF4D6D] text-[14px]" />
+                <span className="text-white font-extrabold text-[17px] leading-none">
+                  {location.label},
+                </span>
+              </div>
+              <p className="text-white/80 text-[11.5px] font-semibold mt-1 leading-snug">
+                {location.fullAddr}
+              </p>
+            </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-14">
-            {[1, 2, 3].map((i) => (
-              <div 
-                key={i} 
-                className="h-80 bg-white/40 backdrop-blur-xl rounded-[50px] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col items-center justify-center p-10 text-center transition-all hover:bg-white/60"
+
+          <div className="flex items-center bg-white rounded-full px-4 py-[13px] shadow-xl mt-8">
+            <FiSearch className="text-[#8B8CF7] text-[18px] mr-3 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search items near you"
+              className="flex-1 bg-transparent outline-none text-[13.5px] font-semibold placeholder:text-gray-400 text-gray-700"
+            />
+            <FiFilter className="text-[#8B8CF7] text-[18px]" />
+          </div>
+        </div>
+
+        {/* SCROLLABLE AREA */}
+        <div className="flex-1 overflow-y-auto pb-[80px]">
+          <div className="px-4 pt-[14px] pb-[6px]">
+            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+              {recommendations.map((item) => (
+                <div key={item.id} className="flex flex-col items-center shrink-0">
+                  <div className="w-[95px] h-[85px] bg-[#e8eaf6] rounded-[18px] overflow-hidden shadow-md shadow-indigo-100">
+                    <img src={item.img} alt={item.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div
+                    className="w-[65px] h-[7px] rounded-full"
+                    style={{ background: "radial-gradient(ellipse,rgba(99,102,241,0.22) 0%,transparent 70%)" }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <h2 className="text-[17px] font-black text-[#1a1a2e] px-4 pt-3 pb-2">
+            Recommended for you
+          </h2>
+
+          <div className="flex flex-col gap-3 px-[14px] pb-4">
+            {recommendations.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-[22px] p-3 flex items-center gap-3 shadow shadow-indigo-100 active:scale-[0.98] transition-transform"
               >
-                {/* Placeholder for Trust Content */}
-                <div className="w-16 h-16 bg-[#8B8CF7]/10 rounded-3xl mb-6" />
-                <div className="h-4 w-3/4 bg-gray-200 rounded-full mb-3" />
-                <div className="h-4 w-1/2 bg-gray-100 rounded-full" />
+                <div className="w-[85px] h-[76px] rounded-[16px] overflow-hidden shrink-0 bg-[#f0f2f8]">
+                  <img src={item.img} alt={item.name} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <p className="font-extrabold text-[14.5px] text-[#1a1a2e]">{item.name}</p>
+                  <p className="font-black text-[14px] text-[#6366F1] mt-[1px]">₹{item.price} / day</p>
+                  <p className="text-[11.5px] font-semibold text-gray-400 mt-[1px]">{item.dist}</p>
+                  <div className="flex items-center gap-1 mt-[3px]">
+                    <FiMapPin className="text-[#8B8CF7] text-[11px]" />
+                    <span className="text-[11.5px] font-semibold text-gray-400">{item.area}</span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-        </section>
-      </main>
+        </div>
+
+        {/* STICKY BOTTOM NAV */}
+        <div className="sticky bottom-0 z-50 bg-white rounded-t-[24px] shadow-[0_-4px_24px_rgba(99,102,241,0.12)] flex justify-around items-center px-2 pt-3 pb-4">
+          {navItems.slice(0, 2).map(({ id, Icon, label }) => (
+            <button key={id} onClick={() => setActiveNav(id)} className="flex flex-col items-center gap-1 px-4 py-1">
+              <Icon className={`text-[22px] transition-colors ${activeNav === id ? "text-[#6366F1]" : "text-gray-300"}`} />
+              {activeNav === id && <div className="w-[5px] h-[5px] rounded-full bg-[#6366F1]" />}
+            </button>
+          ))}
+          <button className="w-[52px] h-[52px] rounded-full flex items-center justify-center -mt-[18px]">
+            <FiPlus className="text-black text-[24px]" strokeWidth={2.5} />
+          </button>
+          {navItems.slice(2).map(({ id, Icon, label }) => (
+            <button key={id} onClick={() => setActiveNav(id)} className="flex flex-col items-center gap-1 px-4 py-1">
+              <Icon className={`text-[22px] transition-colors ${activeNav === id ? "text-[#6366F1]" : "text-gray-300"}`} />
+              {activeNav === id && <div className="w-[5px] h-[5px] rounded-full bg-[#6366F1]" />}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
