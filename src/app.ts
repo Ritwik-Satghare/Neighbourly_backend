@@ -4,6 +4,10 @@ import listingRoutes from './routes/listing_routes';
 import offerRoutes from './routes/offer_routes';
 import bookingRoutes from './routes/booking_routes';
 import splitRoutes from './routes/split_routes';
+import paymentRoutes from './routes/payment_routes';
+import conversationRoutes from './routes/conversation_routes';
+import messageRoutes from './routes/message_routes';
+import reviewRoutes from './routes/review_routes';
 
 const app = express();
 
@@ -17,6 +21,10 @@ app.use('/listing', listingRoutes);
 app.use('/offer', offerRoutes);
 app.use('/booking', bookingRoutes);
 app.use('/split', splitRoutes);
+app.use('/payment', paymentRoutes);
+app.use('/conversation', conversationRoutes);
+app.use('/message', messageRoutes);
+app.use('/review', reviewRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
