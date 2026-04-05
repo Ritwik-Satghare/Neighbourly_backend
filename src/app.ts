@@ -1,6 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import listingRoutes from './routes/listing_routes';
+import paymentRoutes from './routes/payment_routes';
+import conversationRoutes from './routes/conversation_routes';
+import messageRoutes from './routes/message_routes';
+import reviewRoutes from './routes/review_routes';
 
 const app = express();
 
@@ -11,6 +15,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/listing', listingRoutes);
+app.use('/payment', paymentRoutes);
+app.use('/conversation', conversationRoutes);
+app.use('/message', messageRoutes);
+app.use('/review', reviewRoutes);
 
 // Generic Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
