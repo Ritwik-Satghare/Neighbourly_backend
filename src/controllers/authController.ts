@@ -1,13 +1,14 @@
-import User from "../models/User.js";
-import OTP from "../models/OTPVerification.js";
+import { Request, Response } from "express";
+import User from "../models/User";
+import OTP from "../models/OTPVerification";
 import bcrypt from "bcryptjs";
 
-import generateToken from "../utils/generateToken.js";
-import generateOTP from "../utils/generateOTP.js";
-import sendEmail from "../utils/sendEmail.js";
+import generateToken from "../utils/generateToken";
+import generateOTP from "../utils/generateOTP";
+import sendEmail from "../utils/sendEmail";
 
 
-export const registerUser = async (req, res) => {
+export const registerUser = async (req: Request, res: Response) => {
   const { fullName, email, password, confirmPassword } = req.body;
   if (password !== confirmPassword) {
     return res.status(400).json({ message: "Passwords do not match" });
@@ -28,12 +29,12 @@ export const registerUser = async (req, res) => {
 
 
 
-export const loginUser = async (req, res) => {
+export const loginUser = async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email });
 
-  if (user && (await bcrypt.compare(password, user.passwordHash))) {
+  if (user && (await bcrypt.compare(password, user.passwordHash || ''))) {
     res.json({ token: generateToken(user._id) });
   } else {
     res.status(401).json({ message: "Invalid credentials" });
@@ -41,7 +42,7 @@ export const loginUser = async (req, res) => {
 };
 
 
-export const sendOTP = async (req, res) => {
+export const sendOTP = async (req: Request, res: Response) => {
   const { userId } = req.body;
   const user = await User.findById(userId);
   
@@ -72,7 +73,7 @@ export const sendOTP = async (req, res) => {
 
 
 
-export const verifyOTP = async (req, res) => {
+export const verifyOTP = async (req: Request, res: Response) => {
   const { userId, code } = req.body;
 
   const otp = await OTP.findOne({ userID: userId, code });

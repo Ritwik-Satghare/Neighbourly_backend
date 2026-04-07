@@ -2,10 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    [key: string]: any;
-  };
   file?: any;
   files?: any;
 }
@@ -25,7 +21,8 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
         return;
       }
       
-      req.user = { id: userID };
+      // Store user info on request - compatible with global Express.Request.user type
+      (req as any).user = { _id: userID, id: userID };
       next();
     } catch (err) {
       res.status(403).json({ success: false, message: 'Invalid or expired token' });
