@@ -12,6 +12,7 @@ const pages = [
   { name: "Product Details", path: "/product-details" },
   { name: "Signup", path: "/signup" },
   { name: "Landing Page", path: "/landing-page" },
+  { name: "Home Page", path: "/home" },
   { name: "Lender Dashboard", path: "/lender-dashboard" },
   { name: "Welcome", path: "/welcome" },
   { name: "Wireframe 5", path: "/wireframe-5" },
