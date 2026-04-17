@@ -14,6 +14,7 @@ const pages = [
   { name: "Landing Page", path: "/landing-page" },
   { name: "Home Page", path: "/home" },
   { name: "Lender Dashboard", path: "/lender-dashboard" },
+  { name: "Item Verification", path: "/item-verification" },
   { name: "Welcome", path: "/welcome" },
   { name: "Wireframe 5", path: "/wireframe-5" },
   { name: "Wireframe 10", path: "/wireframe-10" },
