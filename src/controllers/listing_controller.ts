@@ -12,6 +12,8 @@ export const createListingSchema = z.object({
     location: z.string().optional(),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
+    lat: z.number().min(-90).max(90).optional(),
+    lng: z.number().min(-180).max(180).optional(),
   }),
 });
 
@@ -24,6 +26,8 @@ export const updateListingSchema = z.object({
     location: z.string().optional(),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
+    lat: z.number().min(-90).max(90).optional(),
+    lng: z.number().min(-180).max(180).optional(),
   }),
 });
 
@@ -145,5 +149,97 @@ export const getListingsByUser = async (req: Request, res: Response): Promise<vo
     });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message || 'Error fetching user listings' });
+  }
+};
+
+export const getNearbyListings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { lat, lng, radius } = req.query;
+
+    if (lat === undefined || lng === undefined || radius === undefined) {
+      res.status(400).json({ success: false, message: 'Missing lat, lng, or radius' });
+      return;
+    }
+
+    const numLat = Number(lat);
+    const numLng = Number(lng);
+    const numRadius = Number(radius);
+
+    if (isNaN(numLat) || isNaN(numLng) || isNaN(numRadius)) {
+      res.status(400).json({ success: false, message: 'lat, lng, and radius must be valid numbers' });
+      return;
+    }
+
+    const listings = await listingService.getNearbyListings(numLat, numLng, numRadius);
+    res.status(200).json({ success: true, data: listings });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Internal server error' });
+  }
+};
+
+export const searchListings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { category, minPrice, maxPrice, lat, lng, radius, rating, startDate, endDate } = req.query;
+    const filters: Parameters<typeof listingService.searchListings>[0] = {};
+
+    if (category !== undefined) filters.category = String(category);
+    
+    if (minPrice !== undefined) {
+      const parsed = Number(minPrice);
+      if (isNaN(parsed)) {
+        res.status(400).json({ success: false, message: 'minPrice must be a valid number' });
+        return;
+      }
+      filters.minPrice = parsed;
+    }
+
+    if (maxPrice !== undefined) {
+      const parsed = Number(maxPrice);
+      if (isNaN(parsed)) {
+        res.status(400).json({ success: false, message: 'maxPrice must be a valid number' });
+        return;
+      }
+      filters.maxPrice = parsed;
+    }
+
+    if (rating !== undefined) {
+      const parsed = Number(rating);
+      if (isNaN(parsed)) {
+        res.status(400).json({ success: false, message: 'rating must be a valid number' });
+        return;
+      }
+      filters.rating = parsed;
+    }
+
+    if (lat !== undefined || lng !== undefined || radius !== undefined) {
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      const numRadius = Number(radius);
+      if (isNaN(numLat) || isNaN(numLng) || isNaN(numRadius)) {
+        res.status(400).json({ success: false, message: 'lat, lng, and radius must be valid numbers' });
+        return;
+      }
+      filters.lat = numLat;
+      filters.lng = numLng;
+      filters.radius = numRadius;
+    }
+
+    if (startDate !== undefined || endDate !== undefined) {
+      const start = new Date(String(startDate));
+      const end = new Date(String(endDate));
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        res.status(400).json({ success: false, message: 'startDate and endDate must be valid ISO dates' });
+        return;
+      }
+      
+      filters.startDate = start.toISOString();
+      filters.endDate = end.toISOString();
+    }
+
+    const listings = await listingService.searchListings(filters);
+    res.status(200).json({ success: true, data: listings });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Internal server error' });
   }
 };

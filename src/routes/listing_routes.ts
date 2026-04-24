@@ -32,6 +32,8 @@ router.delete(
   listingController.deleteListing
 );
 
+router.get('/nearby', listingController.getNearbyListings);
+router.get('/search', listingController.searchListings);
 router.get('/all', listingController.getAllListings);
 router.get('/user/:userID', listingController.getListingsByUser);
 router.get('/:id', listingController.getListingById);
