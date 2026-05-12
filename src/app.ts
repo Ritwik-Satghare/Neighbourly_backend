@@ -8,7 +8,7 @@ import paymentRoutes from './routes/payment_routes';
 import conversationRoutes from './routes/conversation_routes';
 import messageRoutes from './routes/message_routes';
 import reviewRoutes from './routes/review_routes';
-
+import authRoutes from './routes/authRoutes';
 const app = express();
 
 // Middlewares
@@ -17,6 +17,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+app.use('/auth', authRoutes);
 app.use('/listing', listingRoutes);
 app.use('/offer', offerRoutes);
 app.use('/booking', bookingRoutes);
