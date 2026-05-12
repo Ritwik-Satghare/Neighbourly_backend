@@ -2,8 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 export interface AuthRequest extends Request {
-  file?: any;
-  files?: any;
+  user?: {
+    id: string;
+  };
 }
 
 export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunction): void => {
