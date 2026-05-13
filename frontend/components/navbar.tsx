@@ -2,9 +2,9 @@
 
 // import Link from "next/link";
 // import { usePathname } from "next/navigation";
-// import { Bell, Menu, MessageCircle, Plus } from "lucide-react";
+// import { Bell, Menu, MessageCircle } from "lucide-react";
+
 // import { BrandLogo } from "@/components/brand-logo";
-// import { Button } from "@/components/ui/button";
 // import { cn } from "@/lib/utils";
 // import type { NavItem } from "@/lib/data";
 
@@ -18,15 +18,18 @@
 //   return (
 //     <header className="sticky top-0 z-40 border-b border-outline/30 bg-surface/80 backdrop-blur-xl">
 //       <div className="flex w-full items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+
+//         {/* Left */}
 //         <div className="flex items-center gap-10">
 //           <BrandLogo />
+
 //           <nav className="hidden items-center gap-6 md:flex">
 //             {items.map((item) => (
 //               <Link
 //                 key={item.href}
 //                 className={cn(
 //                   "text-sm font-medium text-ink-soft transition hover:text-primary",
-//                   pathname === item.href && "text-primary",
+//                   pathname === item.href && "text-primary"
 //                 )}
 //                 href={item.href}
 //               >
@@ -35,17 +38,24 @@
 //             ))}
 //           </nav>
 //         </div>
+
+//         {/* Right */}
 //         <div className="flex items-center gap-2 md:gap-3">
-//           <Link className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low" href="/notifications">
+
+//           <Link
+//             className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low"
+//             href="/notifications"
+//           >
 //             <Bell className="h-5 w-5" />
 //           </Link>
-//           <Link className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low" href="/messages">
+
+//           <Link
+//             className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low"
+//             href="/messages"
+//           >
 //             <MessageCircle className="h-5 w-5" />
 //           </Link>
-//           <Button className="hidden md:inline-flex" href="/create-listing">
-//             <Plus className="mr-2 h-4 w-4" />
-//             List an Item
-//           </Button>
+
 //           <button className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low md:hidden">
 //             <Menu className="h-5 w-5" />
 //           </button>
@@ -58,11 +68,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, Menu, MessageCircle } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+
+import {
+  Bell,
+  Menu,
+  MessageCircle,
+  User,
+  LogOut,
+} from "lucide-react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/utils";
+
 import type { NavItem } from "@/lib/data";
 
 type NavbarProps = {
@@ -71,6 +90,42 @@ type NavbarProps = {
 
 export function Navbar({ items }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const [open, setOpen] = useState(false);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      );
+    };
+  }, []);
+
+  // Sign Out
+  const handleSignOut = () => {
+    // Remove auth data
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    // Redirect to login
+    router.push("/login");
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-outline/30 bg-surface/80 backdrop-blur-xl">
@@ -78,17 +133,18 @@ export function Navbar({ items }: NavbarProps) {
 
         {/* Left */}
         <div className="flex items-center gap-10">
+
           <BrandLogo />
 
           <nav className="hidden items-center gap-6 md:flex">
             {items.map((item) => (
               <Link
                 key={item.href}
+                href={item.href}
                 className={cn(
                   "text-sm font-medium text-ink-soft transition hover:text-primary",
                   pathname === item.href && "text-primary"
                 )}
-                href={item.href}
               >
                 {item.label}
               </Link>
@@ -99,6 +155,7 @@ export function Navbar({ items }: NavbarProps) {
         {/* Right */}
         <div className="flex items-center gap-2 md:gap-3">
 
+          {/* Notifications */}
           <Link
             className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low"
             href="/notifications"
@@ -106,6 +163,7 @@ export function Navbar({ items }: NavbarProps) {
             <Bell className="h-5 w-5" />
           </Link>
 
+          {/* Messages */}
           <Link
             className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low"
             href="/messages"
@@ -113,6 +171,33 @@ export function Navbar({ items }: NavbarProps) {
             <MessageCircle className="h-5 w-5" />
           </Link>
 
+          {/* Profile */}
+          <div className="relative" ref={dropdownRef}>
+
+            <button
+              onClick={() => setOpen(!open)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-low transition hover:bg-surface-card"
+            >
+              <User className="h-5 w-5 text-ink-strong" />
+            </button>
+
+            {/* Dropdown */}
+            {open && (
+              <div className="absolute right-0 mt-3 w-40 rounded-2xl border border-outline/20 bg-white p-2 shadow-xl">
+
+                <button
+                  onClick={handleSignOut}
+                  className="flex w-full items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-red-500 transition hover:bg-surface-low"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
+
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Menu */}
           <button className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low md:hidden">
             <Menu className="h-5 w-5" />
           </button>
