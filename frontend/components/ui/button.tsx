@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type ButtonProps = {
   children: ReactNode;
   href?: string;
   variant?: "primary" | "secondary" | "ghost";
   className?: string;
-};
+} & ButtonHTMLAttributes<HTMLButtonElement>;
 
 const baseStyles =
   "inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition-transform duration-200 hover:-translate-y-0.5";
@@ -18,7 +18,7 @@ const variants = {
   ghost: "bg-transparent text-primary",
 };
 
-export function Button({ children, href, variant = "primary", className }: ButtonProps) {
+export function Button({ children, href, variant = "primary", className, type = "button", ...props }: ButtonProps) {
   const styles = cn(baseStyles, variants[variant], className);
 
   if (href) {
@@ -29,5 +29,9 @@ export function Button({ children, href, variant = "primary", className }: Butto
     );
   }
 
-  return <button className={styles}>{children}</button>;
+  return (
+    <button className={styles} type={type} {...props}>
+      {children}
+    </button>
+  );
 }

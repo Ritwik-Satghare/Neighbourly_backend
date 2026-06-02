@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
-import { publicNav } from "@/lib/data";
+import { marketingNav } from "@/lib/data";
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div>
-      <Navbar items={publicNav} />
+      <Navbar items={marketingNav} variant="marketing" />
       {children}
       <Footer />
     </div>

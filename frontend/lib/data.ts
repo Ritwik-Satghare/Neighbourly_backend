@@ -56,7 +56,14 @@ export type VerificationChecklistItem = {
   label: string;
 };
 
-export const publicNav: NavItem[] = [
+export const marketingNav: NavItem[] = [
+  { href: "#features", label: "Features" },
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#trust", label: "Trust" },
+];
+
+export const workspaceNav: NavItem[] = [
+  { href: "/home", label: "Home" },
   { href: "/browse", label: "Browse" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/lender-dashboard", label: "Lender Dashboard" },
@@ -66,8 +73,8 @@ export const publicNav: NavItem[] = [
 ];
 
 export const footerLinks: NavItem[] = [
-  { href: "/verify", label: "Safety Guide" },
-  { href: "/notifications", label: "Activity" },
+  { href: "#features", label: "Features" },
+  { href: "#how-it-works", label: "How it works" },
   { href: "/login", label: "Login" },
   { href: "/signup", label: "Sign Up" },
 ];
@@ -198,6 +205,7 @@ export const notifications = [
 ];
 
 export const dashboardLinks = [
+  { href: "/home", label: "Home" },
   { href: "/dashboard", label: "Overview" },
   { href: "/browse", label: "Browse" },
   { href: "/lender-dashboard", label: "Lender Dashboard" },
