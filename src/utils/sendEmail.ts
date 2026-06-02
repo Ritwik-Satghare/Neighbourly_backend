@@ -19,12 +19,16 @@ const sendEmail = async (to: string, subject: string, text: string): Promise<voi
       subject,
       text,
     };
+    console.log(mailOptions);
+
     await transporter.sendMail(mailOptions);
     console.log("Email sent successfully");
   } catch (error) {
     console.error("Error sending email:", error);
     throw error;
   }
+  // console.log(process.eEMAIL_USER);
+
 };
 
 export default sendEmail;

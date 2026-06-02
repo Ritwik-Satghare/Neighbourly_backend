@@ -43,6 +43,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
 
 export const sendOTP = async (req: Request, res: Response) => {
+  
   const { userId } = req.body;
   const user = await User.findById(userId);
   
@@ -56,7 +57,8 @@ export const sendOTP = async (req: Request, res: Response) => {
     userID: userId,
     code,
     type: "email",
-    expiresAt: Date.now() + 300000
+    // expiresAt: new Date(2026, 5, 2, 8, 0, 0)
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000)
   });
 
   try {
@@ -65,18 +67,23 @@ export const sendOTP = async (req: Request, res: Response) => {
       "Your OTP Code",
       `Your verification OTP is: ${code}. It is valid for 5 minutes.`
     );
+
     res.json({ message: "OTP sent to email", code });
   } catch (error) {
     res.status(500).json({ message: "Failed to send email OTP" });
   }
+  console.log('sent email')
 };
 
 
 
 export const verifyOTP = async (req: Request, res: Response) => {
+   console.log("hello");
   const { userId, code } = req.body;
-
+ 
   const otp = await OTP.findOne({ userID: userId, code });
+ console.log(otp);
+ 
 
   if (!otp) return res.status(400).json({ message: "Invalid OTP" });
 
