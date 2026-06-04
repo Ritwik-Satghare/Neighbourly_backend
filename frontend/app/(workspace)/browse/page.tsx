@@ -28,36 +28,60 @@ export default function BrowsePage() {
               category: selectedCategory || undefined,
               search: initialSearch || undefined,
             })
-          : await getAllListings();
+          : await getAllListings(1, 100);
 
-        // Map backend listings to frontend UI structure
+        // Debug: raw API response and counts
+        console.log("Listings API response:", response);
         const listingsArray = response.listings ?? [];
+        console.log("Total listings received:", listingsArray.length);
 
-const mappedListings: Listing[] = listingsArray.map((item: any) => {
-  const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
-  const chosenField = item.image ? 'image' : item.images?.[0] ? 'images[0]' : item.imageUrl ? 'imageUrl' : item.imageURLs?.[0] ? 'imageURLs[0]' : 'fallback';
-  const image = item.image ?? item.images?.[0] ?? item.imageUrl ?? item.imageURLs?.[0] ?? FALLBACK_IMAGE;
-  try { console.log(`[listing image source] ${item.id ?? item._id ?? 'unknown'} -> ${chosenField}`); } catch (e) {}
+        const mappedListings: Listing[] = listingsArray.map((item: any) => {
+          const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+          const imageSrc =
+            item.image ??
+            item.imageUrl ??
+            item.images?.find((img: any) => img?.isPrimary)?.imageUrl ??
+            item.images?.[0]?.imageUrl ??
+            item.imageURLs?.[0] ??
+            FALLBACK_IMAGE;
 
-  return {
-    id: item.id ?? item._id ?? String(Math.random()),
-    title: item.title ?? item.name ?? "",
-    category: item.category ?? "Tools",
-    distance: item.distance ?? "0.8km away",
-    pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
-    rating: item.rating ?? 4.9,
-    trustScore: item.trustScore ?? item.trust_score ?? 98,
-    image: image,
-    summary: item.summary ?? item.description ?? "",
-    host: item.host ?? "Neighbor",
-    badge: item.badge,
-  } as Listing;
-});
+          // Temporary debug logging to trace where images come from
+          try {
+            console.log("Listing image mapping:", {
+              listingName: item.name ?? item.title,
+              image: item.image,
+              imageUrl: item.imageUrl,
+              images: item.images,
+              resolvedImage: imageSrc,
+            });
+          } catch (e) {}
+
+          try { console.log("Listing:", item._id, item.name, item.ownerID); } catch (e) {}
+
+          return {
+            id: item.id ?? item._id ?? String(Math.random()),
+            title: item.title ?? item.name ?? "",
+            category: item.category ?? "Tools",
+            distance: item.distance ?? "0.8km away",
+            pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
+            rating: item.rating ?? 4.9,
+            trustScore: item.trustScore ?? item.trust_score ?? 98,
+            image: imageSrc,
+            summary: item.summary ?? item.description ?? "",
+            host: item.host ?? "Neighbor",
+            badge: item.badge,
+          } as Listing;
+        });
 
         setListings(mappedListings);
+        console.log("Mapped listings:", mappedListings);
       } catch (err: any) {
-        // If the API request fails (e.g., auth token missing or invalid), surface the error.
-        console.error("Failed to fetch listings from API:", err);
+        // If the API request fails (e.g., auth token missing or invalid), surface the error with structured details.
+        console.error("Failed to fetch listings from API:", {
+          error: err,
+          message: err?.message,
+          response: err?.response,
+        });
         // Show the error to the user instead of silent fallback.
         const errMsg = err?.message ?? "Failed to load listings.";
         setError(errMsg);

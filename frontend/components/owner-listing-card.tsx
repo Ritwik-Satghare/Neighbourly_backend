@@ -16,7 +16,28 @@ export function OwnerListingCard({ listing, onDelete }: OwnerListingCardProps) {
       <div className="relative h-48 w-full overflow-hidden rounded-xl">
         {(() => {
           const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1504148455328-c376907d081c";
-          const imageSrc = listing.image || (listing as any).images?.[0] || (listing as any).imageUrl || (listing as any).imageURLs?.[0] || FALLBACK_IMAGE;
+          const imageSrc =
+            listing.image ||
+            (listing as any).imageUrl ||
+            (listing as any).images?.find((img: any) => img?.isPrimary)?.imageUrl ||
+            (listing as any).images?.[0]?.imageUrl ||
+            (listing as any).imageURLs?.[0] ||
+            FALLBACK_IMAGE;
+
+          try {
+            console.log("Owner listing image mapping:", {
+              listingName: (listing as any).name || listing.title,
+              image: listing.image,
+              imageUrl: (listing as any).imageUrl,
+              images: (listing as any).images,
+              resolvedImage: imageSrc,
+            });
+          } catch (e) {}
+
+          if (!imageSrc || imageSrc === "") {
+            console.error("Missing image source", listing);
+          }
+
           return (
             <Image alt={listing.title} className="object-cover" fill sizes="(max-width: 768px) 100vw, 33vw" src={imageSrc} />
           );

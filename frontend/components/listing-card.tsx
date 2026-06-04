@@ -7,7 +7,22 @@ import { formatCurrency } from "@/lib/utils";
 export function ListingCard({ listing }: { listing: Listing }) {
   const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1504148455328-c376907d081c";
   const imageSrc =
-    listing.image || listing.images?.[0] || (listing as any).imageUrl || (listing as any).imageURLs?.[0] || FALLBACK_IMAGE;
+    listing.image ||
+    (listing as any).imageUrl ||
+    (listing as any).images?.find((img: any) => img?.isPrimary)?.imageUrl ||
+    (listing as any).images?.[0]?.imageUrl ||
+    (listing as any).imageURLs?.[0] ||
+    FALLBACK_IMAGE;
+
+  try {
+    console.log("Listing image mapping:", {
+      listingName: (listing as any).name || listing.title,
+      image: listing.image,
+      imageUrl: (listing as any).imageUrl,
+      images: (listing as any).images,
+      resolvedImage: imageSrc,
+    });
+  } catch (e) {}
 
   return (
     <Link
@@ -16,6 +31,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
     >
       <div className="flex h-full flex-col">
         <div className="relative h-48 w-full overflow-hidden rounded-lg">
+          {(!imageSrc || imageSrc === "") && console.error("Missing image source", listing)}
           <Image
             alt={listing.title}
             className="object-cover transition duration-500 group-hover:scale-105"

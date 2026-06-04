@@ -39,18 +39,27 @@ export default function DashboardPage() {
     const response = await getUserListings(currentId);
 
     const listingsData = response?.listings ?? [];
+    console.log("Dashboard listings response count:", listingsData.length);
     const mapped = listingsData.map((item: any) => {
       const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
-      const chosenField = item.image ? 'image' : item.images?.[0] ? 'images[0]' : item.imageUrl ? 'imageUrl' : item.imageURLs?.[0] ? 'imageURLs[0]' : 'fallback';
-      const image = item.image ?? item.images?.[0] ?? item.imageUrl ?? item.imageURLs?.[0] ?? FALLBACK_IMAGE;
-      try { console.log(`[user listing image source] ${item.id ?? item._id ?? 'unknown'} -> ${chosenField}`); } catch (e) {}
+      const imageSrc =
+        item.image ??
+        item.imageUrl ??
+        item.images?.find((img: any) => img?.isPrimary)?.imageUrl ??
+        item.images?.[0]?.imageUrl ??
+        item.imageURLs?.[0] ??
+        FALLBACK_IMAGE;
+
+      try {
+        console.log("User listing image mapping:", { id: item._id ?? item.id, name: item.name ?? item.title, resolved: imageSrc });
+      } catch (e) {}
 
       return {
         id: item.id ?? item._id ?? String(Math.random()),
         title: item.title ?? item.name ?? "",
         pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
         status: item.status ?? "Active",
-        image: image,
+        image: imageSrc,
         category: item.category ?? "Tools",
         summary: item.summary ?? item.description ?? "",
         requests: item.requests ?? 0,

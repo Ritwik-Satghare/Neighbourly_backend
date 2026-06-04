@@ -101,6 +101,16 @@ export default function ItemPage({ params }: ItemPageProps) {
       setError("");
       try {
         const data = await apiGetListingById(id);
+        console.log("getListingById response:", data);
+        const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+        const imageSrc =
+          data.image ??
+          data.imageUrl ??
+          data.images?.find((img: any) => img?.isPrimary)?.imageUrl ??
+          data.images?.[0]?.imageUrl ??
+          data.imageURLs?.[0] ??
+          FALLBACK_IMAGE;
+        try { console.log("Item image mapping:", { id: data._id ?? data.id, name: data.name ?? data.title, images: data.images, resolved: imageSrc }); } catch (e) {}
         const listingId = data.id ?? data._id ?? id;
         setItem({
           id: listingId,
@@ -110,7 +120,7 @@ export default function ItemPage({ params }: ItemPageProps) {
           pricePerDay: Number(data.pricePerDay ?? data.price_per_day ?? 0),
           rating: data.rating ?? 4.9,
           trustScore: data.trustScore ?? data.trust_score ?? 98,
-          image: data.image ?? data.images?.[0] ?? "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80",
+          image: imageSrc,
           summary: data.summary ?? data.description ?? "",
           host: data.host ?? "Neighbor",
         });
