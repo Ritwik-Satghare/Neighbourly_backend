@@ -206,7 +206,7 @@ export const notifications = [
 
 export const dashboardLinks = [
   { href: "/home", label: "Home" },
-  { href: "/dashboard", label: "Overview" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/browse", label: "Browse" },
   { href: "/lender-dashboard", label: "Lender Dashboard" },
   { href: "/create-listing", label: "Create Listing" },

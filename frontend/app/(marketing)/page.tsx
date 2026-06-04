@@ -30,10 +30,10 @@ export default function LandingPage() {
               Local marketplace for useful things
             </span>
             <div className="space-y-5">
-              <h1 className="font-headline text-5xl font-extrabold leading-tight tracking-tight text-ink-strong md:text-7xl">
+              <h1 className="font-headline text-6xl font-extrabold leading-tight tracking-tight text-ink-strong md:text-8xl">
                 Neighbourly turns nearby stuff into shared value.
               </h1>
-              <p className="max-w-2xl text-lg leading-8 text-ink-soft">
+              <p className="max-w-2xl text-xl leading-8 text-ink-soft">
                 Borrow trusted tools, cameras, outdoor gear, and hosting essentials from real neighbors, or earn from the items you already own.
               </p>
             </div>

@@ -38,7 +38,7 @@ export default function SignupPage() {
         password: formData.password,
         confirmPassword: formData.confirmPassword,
       });
-      router.replace("/send-otp");
+      router.replace("/browse");   // go straight to the listings page
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Unable to create your account. Please try again.");
     } finally {

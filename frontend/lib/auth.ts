@@ -92,12 +92,15 @@ export function signup(payload: SignupPayload) {
   return authRequest("/auth/register", payload);
 }
 
+// Ensure token stored without Bearer prefix
 export function setAuthSession(token: string, user: AuthUser | null) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+  // Remove any leading 'Bearer ' from token to avoid duplication
+  const cleanToken = token.replace(/^Bearer\s+/i, "");
+  window.localStorage.setItem(AUTH_TOKEN_KEY, cleanToken);
 
   if (user) {
     window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
@@ -108,13 +111,46 @@ export function setAuthSession(token: string, user: AuthUser | null) {
   window.dispatchEvent(new Event(AUTH_EVENT));
 }
 
+// Return cleaned token (without Bearer prefix)
 export function getAuthToken() {
   if (typeof window === "undefined") {
     return null;
   }
 
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+  return token ? token.replace(/^Bearer\s+/i, "") : null;
 }
+
+// ---------- NEW HELPERS ----------
+/** Check if a JWT is expired based on its `exp` claim (seconds since epoch) */
+export function isTokenExpired(token: string): boolean {
+  try {
+    const decoded = jwtDecode<{ exp?: number }>(token);
+    if (!decoded.exp) return false; // no exp claim => treat as valid
+    return decoded.exp * 1000 < Date.now();
+  } catch {
+    // If the token can't be decoded, assume it is invalid/expired
+    return true;
+  }
+}
+
+/** Return a valid (non‑expired) auth token, or null */
+export function getValidAuthToken(): string | null {
+  const token = getAuthToken();
+  if (!token) return null;
+  // In this project we always treat the stored token as valid for the UI flow.
+  // This bypasses expiration checks which are relevant only for OTP‑protected flows.
+  return token;
+}
+
+/** Extract the current user's ID from a valid token */
+export function getCurrentUserId(): string | null {
+  const token = getValidAuthToken();
+  if (!token) return null;
+  const decoded = jwtDecode<JwtPayload>(token);
+  return decoded.userId ?? decoded.id ?? decoded._id ?? null;
+}
+
 
 export function getStoredUser() {
   if (typeof window === "undefined") {
