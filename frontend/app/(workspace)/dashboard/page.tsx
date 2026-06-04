@@ -1,9 +1,13 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { ListingCard } from "@/components/listing-card";
 import { OwnerListingCard } from "@/components/owner-listing-card";
 import { PageHeader } from "@/components/page-header";
 import { StatsCard } from "@/components/stats-card";
 import { listings, stats, userListings } from "@/lib/data";
+
+import { getBookings } from "@/services/booking";
 
 export default function DashboardPage() {
   return (
@@ -30,6 +34,18 @@ export default function DashboardPage() {
           <Button href="/messages" variant="secondary">
             Open inbox
           </Button>
+          <Button
+  onClick={async () => {
+    try {
+      const data = await getBookings();
+      console.log("BOOKINGS ARRAY:", data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  }}
+>
+  Test Booking API
+</Button>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {listings.slice(0, 3).map((listing) => (
