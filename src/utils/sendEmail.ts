@@ -6,16 +6,16 @@ dotenv.config();
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
-  secure: true, // true for secure port 465, false for alternative port 587
+  secure: true, 
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  // cloud container connection settings
-  connectionTimeout: 10000, // 10 seconds connection timeout
-  greetingTimeout: 5000,     // 5 seconds greeting timeout
-  dnsTimeout: 5000,          // 5 seconds DNS resolution timeout
+  // 💡 FORCE IPv4 ROUTING ONLY (Bypasses the broken Render IPv6 network route)
+  connectionTimeout: 10000, 
+  greetingTimeout: 5000,
+  dnsTimeout: 5000,
 });
 
 const sendEmail = async (to: string, subject: string, text: string): Promise<void> => {
