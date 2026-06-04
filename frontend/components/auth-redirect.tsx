@@ -2,20 +2,44 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { isAuthenticated, subscribeToAuthChanges } from "@/lib/auth";
+import { useRouter, usePathname } from "next/navigation";
+import {
+  isAuthenticated,
+  subscribeToAuthChanges,
+} from "@/lib/auth";
 
-export function AuthRedirect({ children }: { children: ReactNode }) {
+export function AuthRedirect({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const router = useRouter();
-  const authenticated = useSyncExternalStore(subscribeToAuthChanges, isAuthenticated, () => false);
+  const pathname = usePathname();
+
+  const authenticated = useSyncExternalStore(
+    subscribeToAuthChanges,
+    isAuthenticated,
+    () => false
+  );
+
+  const allowedAuthPages = [
+    "/send-otp",
+    "/verify-otp",
+  ];
 
   useEffect(() => {
-    if (authenticated) {
+    if (
+      authenticated &&
+      !allowedAuthPages.includes(pathname)
+    ) {
       router.replace("/home");
     }
-  }, [authenticated, router]);
+  }, [authenticated, pathname, router]);
 
-  if (authenticated) {
+  if (
+    authenticated &&
+    !allowedAuthPages.includes(pathname)
+  ) {
     return (
       <div className="grid min-h-screen place-items-center px-4 text-sm font-medium text-ink-soft">
         Opening Neighbourly...

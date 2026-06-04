@@ -160,3 +160,59 @@ export function subscribeToAuthChanges(callback: () => void) {
     window.removeEventListener(AUTH_EVENT, callback);
   };
 }
+
+export async function sendOtp(userId: string) {
+  const response = await fetch(
+    getAuthUrl("/auth/send-otp"),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId,
+      }),
+    }
+  );
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      payload.message ?? payload.error ?? "Failed to send OTP."
+    );
+  }
+
+  return payload;
+}
+
+export async function verifyOtp(
+  userId: string,
+  code: string
+) {
+  const response = await fetch(
+    getAuthUrl("/auth/verify-otp"),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId,
+        code,
+      }),
+    }
+  );
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      payload.message ??
+      payload.error ??
+      "OTP verification failed."
+    );
+  }
+
+  return payload;
+}
