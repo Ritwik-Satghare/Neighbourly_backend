@@ -25,6 +25,8 @@ export const createOffer = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
+    
+
     const offer = await offerService.createOffer(userID, req.body);
 
     res.status(201).json({

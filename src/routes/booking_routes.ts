@@ -29,6 +29,14 @@ router.patch(
   bookingController.updateBookingStatus
 );
 
+// ─── Rental Lifecycle ──────────────────────────────────────────────────────
+
+// PATCH /booking/start/:id — Mark item as handed over (owner only)
+router.patch('/start/:id', bookingController.startRental);
+
+// PATCH /booking/return/:id — Mark item as returned (owner only)
+router.patch('/return/:id', bookingController.returnRental);
+
 // ─── Booking Condition Images ────────────────────────────────────────────────
 
 // POST /booking/upload-condition — Upload a before/after condition image

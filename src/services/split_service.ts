@@ -145,6 +145,7 @@ export const payShare = async (bookingID: string, userID: string) => {
   if (allPaid) {
     // CRITICAL: Auto-confirm booking when all friends have paid
     booking.status = 'confirmed';
+    booking.rentalState = 'scheduled';
     await booking.save();
   }
 
