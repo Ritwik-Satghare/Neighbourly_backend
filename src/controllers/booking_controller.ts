@@ -133,3 +133,76 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
     });
   }
 };
+
+// ─── Rental Lifecycle ────────────────────────────────────────────────────────
+
+/**
+ * PATCH /booking/start/:id
+ * Mark item as handed over — starts the rental (owner only).
+ */
+export const startRental = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userID = req.user?.id;
+    if (!userID) {
+      res.status(401).json({ success: false, message: 'Not authenticated' });
+      return;
+    }
+
+    const booking = await bookingService.startRental(req.params.id, userID);
+
+    res.status(200).json({
+      success: true,
+      message: 'Rental started — item handed over to renter',
+      data: booking,
+    });
+  } catch (error: any) {
+    if (error.message.includes('Forbidden')) {
+      res.status(403).json({ success: false, message: error.message });
+      return;
+    }
+    if (error.message.includes('not found')) {
+      res.status(404).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Error starting rental',
+    });
+  }
+};
+
+/**
+ * PATCH /booking/return/:id
+ * Mark item as returned by the renter (owner only).
+ */
+export const returnRental = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userID = req.user?.id;
+    if (!userID) {
+      res.status(401).json({ success: false, message: 'Not authenticated' });
+      return;
+    }
+
+    const booking = await bookingService.returnRental(req.params.id, userID);
+
+    res.status(200).json({
+      success: true,
+      message: 'Item returned — awaiting owner verification to complete booking',
+      data: booking,
+    });
+  } catch (error: any) {
+    if (error.message.includes('Forbidden')) {
+      res.status(403).json({ success: false, message: error.message });
+      return;
+    }
+    if (error.message.includes('not found')) {
+      res.status(404).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Error returning rental',
+    });
+  }
+};
+

@@ -1,5 +1,15 @@
+# Dependencies
 node_modules/
+
+# Environment variables
 .env
+
+# Build outputs
 dist/
 build/
+
+# Test coverage
 coverage/
+
+# Scripts folder inside src
+src/scripts/

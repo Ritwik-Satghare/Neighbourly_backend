@@ -8,6 +8,9 @@ export interface IBooking extends Document {
   endDate: Date;
   totalPrice: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  rentalState: 'scheduled' | 'checked_out' | 'returned' | null;
+  actualStartDate: Date | null;
+  actualReturnDate: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +52,24 @@ const bookingSchema: Schema = new Schema(
       type: String,
       enum: ['pending', 'confirmed', 'cancelled', 'completed'],
       default: 'pending',
+    },
+    // ─── Rental Lifecycle ──────────────────────────────────────────────
+    // Tracks the physical rental state, separate from booking status.
+    // null for pending/cancelled bookings; set to 'scheduled' on confirmation.
+    rentalState: {
+      type: String,
+      enum: ['scheduled', 'checked_out', 'returned'],
+      default: null,
+    },
+    // Audit-only: timestamp when the owner physically handed over the item.
+    actualStartDate: {
+      type: Date,
+      default: null,
+    },
+    // Audit-only: timestamp when the owner marked the item as returned.
+    actualReturnDate: {
+      type: Date,
+      default: null,
     },
   },
   {
