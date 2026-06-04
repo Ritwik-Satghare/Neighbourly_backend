@@ -1,39 +1,57 @@
-import * as nodemailer from "nodemailer";
+import { BrevoClient } from "@getbrevo/brevo";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // true for secure port 465, false for alternative port 587
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  // cloud container connection settings
-  connectionTimeout: 10000, // 10 seconds connection timeout
-  greetingTimeout: 5000,     // 5 seconds greeting timeout
-  dnsTimeout: 5000,          // 5 seconds DNS resolution timeout
-});
+const brevoApiKey = process.env.BREVO_API_KEY;
+const senderEmail = process.env.SENDER_EMAIL;
+const senderName = process.env.SENDER_NAME;
 
-const sendEmail = async (to: string, subject: string, text: string): Promise<void> => {
+if (!brevoApiKey) {
+  throw new Error("Missing required environment variable: BREVO_API_KEY");
+}
+
+if (!senderEmail) {
+  throw new Error("Missing required environment variable: SENDER_EMAIL");
+}
+
+if (!senderName) {
+  throw new Error("Missing required environment variable: SENDER_NAME");
+}
+
+// Initialize the unified Brevo Client using the new SDK pattern
+const brevo = new BrevoClient({ apiKey: brevoApiKey });
+
+const sendEmail = async (
+  to: string,
+  subject: string,
+  text: string,
+  html?: string
+): Promise<void> => {
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    console.log("Sending transactional email via Brevo:", {
       to,
       subject,
-      text,
-    };
+      senderEmail,
+      senderName,
+    });
 
-    console.log("Attempting outbound email payload routing:", mailOptions);
+    // Call through the correct transactionalEmails property namespace
+    await brevo.transactionalEmails.sendTransacEmail({
+      sender: {
+        email: senderEmail,
+        name: senderName,
+      },
+      to: [{ email: to }],
+      subject,
+      textContent: text,
+      htmlContent: html,
+    });
 
-    await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully over secure IPv4 channel");
+    console.log("Brevo email sent successfully");
   } catch (error) {
-    console.error("Error encountered inside transporter.sendMail execution:", error);
-    throw error; // Bubble error up to authController catch block safely
+    console.error("Brevo sendEmail failed:", error);
+    throw error;
   }
 };
 
