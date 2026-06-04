@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+"use client";
+
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { OwnerListingCard } from "@/components/owner-listing-card";
 import { PageHeader } from "@/components/page-header";
@@ -119,11 +122,33 @@ export default function DashboardPage() {
             Open lender dashboard
           </Button>
         </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {userListings.slice(0, 3).map((listing) => (
-            <OwnerListingCard key={listing.id} listing={listing} />
-          ))}
-        </div>
+        
+        {isLoading ? (
+          <div className="flex min-h-40 items-center justify-center text-ink-soft">
+            <span>Loading listings...</span>
+          </div>
+        ) : error ? (
+          <div className="flex min-h-40 items-center justify-center text-tertiary">
+            <span>{error}</span>
+          </div>
+        ) : userListings.length === 0 ? (
+          <EmptyState
+            title="No listings yet"
+            description="List your first item to start earning in your neighborhood."
+            ctaLabel="List an Item"
+            ctaHref="/create-listing"
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {userListings.slice(0, 3).map((listing) => (
+              <OwnerListingCard 
+                key={listing.id} 
+                listing={listing} 
+                onDelete={() => handleDelete(listing.id)}
+              />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

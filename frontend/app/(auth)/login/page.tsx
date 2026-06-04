@@ -24,8 +24,8 @@ export default function LoginPage() {
 
     try {
       await login(formData);
-      const next = new URLSearchParams(window.location.search).get("next") ?? "/home";
-      router.replace(next.startsWith("/") ? next : "/home");
+      const next = new URLSearchParams(window.location.search).get("next") ?? "/browse";
+      router.replace(next.startsWith("/") ? next : "/browse");
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Unable to sign in. Please try again.");
     } finally {

@@ -88,9 +88,10 @@ import type { NavItem } from "@/lib/data";
 type NavbarProps = {
   items: NavItem[];
   variant?: "marketing" | "workspace";
+  onMobileMenuToggle?: () => void;
 };
 
-export function Navbar({ items, variant = "workspace" }: NavbarProps) {
+export function Navbar({ items, variant = "workspace", onMobileMenuToggle }: NavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const isMarketing = variant === "marketing";
@@ -127,7 +128,12 @@ export function Navbar({ items, variant = "workspace" }: NavbarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-outline/30 bg-surface/80 backdrop-blur-xl">
+    <header
+      className={cn(
+        "sticky top-0 z-40 border-b border-outline/30 bg-surface/80 backdrop-blur-xl",
+        !isMarketing && "lg:hidden"
+      )}
+    >
       <div className="flex w-full items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 
         {/* Left */}
@@ -210,10 +216,16 @@ export function Navbar({ items, variant = "workspace" }: NavbarProps) {
             </>
           )}
 
-          {/* Mobile Menu */}
-          <button className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low md:hidden">
-            <Menu className="h-5 w-5" />
-          </button>
+          {/* Mobile Menu – only shown in workspace variant */}
+          {!isMarketing && (
+            <button
+              onClick={onMobileMenuToggle}
+              className="rounded-full p-2 text-ink-soft transition hover:bg-surface-low lg:hidden"
+              aria-label="Toggle navigation menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
     </header>
