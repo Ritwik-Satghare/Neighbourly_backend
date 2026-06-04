@@ -19,12 +19,6 @@ export const createSplitSchema = z.object({
   }),
 });
 
-export const payShareSchema = z.object({
-  body: z.object({
-    bookingID: z.string().min(1, 'Booking ID is required'),
-  }),
-});
-
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
 /**
@@ -80,37 +74,6 @@ export const getSplitsByBooking = async (req: AuthRequest, res: Response): Promi
     res.status(400).json({
       success: false,
       message: error.message || 'Error fetching split details',
-    });
-  }
-};
-
-/**
- * POST /split/pay
- * Pay the authenticated user's share of a split.
- * Body: { bookingID }
- */
-export const payShare = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userID = req.user?.id;
-    if (!userID) {
-      res.status(401).json({ success: false, message: 'Not authenticated' });
-      return;
-    }
-
-    const { bookingID } = req.body;
-    const result = await splitService.payShare(bookingID, userID);
-
-    res.status(200).json({
-      success: true,
-      message: result.allPaid
-        ? 'All shares paid! Booking is now confirmed.'
-        : 'Your share has been paid successfully',
-      data: result,
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Error processing payment',
     });
   }
 };

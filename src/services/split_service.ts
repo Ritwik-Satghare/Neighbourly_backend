@@ -1,15 +1,17 @@
 import BookingSplit from '../models/booking_split_model';
 import Booking from '../models/booking_model';
+import { hasPaymentActivity } from './payment_service';
 
 /**
  * Create split payments for a booking.
  * 
  * Rules:
  * - Only the renter (booking creator) can create splits
- * - Splits can only be created for a 'pending' booking
+ * - Splits can only be created for a 'pending' or 'confirmed' booking
  * - Total split amounts MUST equal booking totalPrice
  * - Each user can only appear once in the split
  * - The renter themselves can be included in the split
+ * - No payment activity must exist for this booking (once payment starts, splits are locked)
  */
 export const createSplit = async (
   bookingID: string,
@@ -24,7 +26,8 @@ export const createSplit = async (
     throw new Error('Forbidden: Only the renter can create split payments');
   }
 
-  if (booking.status !== 'pending') {
+  // Allow split creation for pending or confirmed bookings
+  if (booking.status !== 'pending' && booking.status !== 'confirmed') {
     throw new Error(`Cannot create splits for a booking with status '${booking.status}'`);
   }
 
@@ -32,6 +35,12 @@ export const createSplit = async (
   const existingSplits = await BookingSplit.countDocuments({ bookingID });
   if (existingSplits > 0) {
     throw new Error('Splits already exist for this booking. Delete existing splits first.');
+  }
+
+  // Block split creation if any payment activity exists
+  const paymentStarted = await hasPaymentActivity(bookingID);
+  if (paymentStarted) {
+    throw new Error('Cannot create splits: payment activity already exists for this booking');
   }
 
   // Validate: no duplicate users
@@ -100,58 +109,7 @@ export const getSplitsByBooking = async (bookingID: string) => {
       totalPending,
       allPaid,
       bookingStatus: booking.status,
+      rentalState: booking.rentalState,
     },
-  };
-};
-
-/**
- * Pay a user's share of the split.
- * 
- * CRITICAL LOGIC:
- * - When ALL splits are paid → booking status is automatically updated to 'confirmed'
- * - This is the core of the split ownership system
- */
-export const payShare = async (bookingID: string, userID: string) => {
-  const booking = await Booking.findById(bookingID);
-  if (!booking) throw new Error('Booking not found');
-
-  if (booking.status === 'cancelled') {
-    throw new Error('Cannot pay for a cancelled booking');
-  }
-
-  if (booking.status === 'completed') {
-    throw new Error('Booking is already completed');
-  }
-
-  // Find this user's split record
-  const split = await BookingSplit.findOne({ bookingID, userID });
-  if (!split) {
-    throw new Error('No split payment found for this user on this booking');
-  }
-
-  if (split.status === 'paid') {
-    throw new Error('You have already paid your share');
-  }
-
-  // Mark as paid
-  split.status = 'paid';
-  split.paidAt = new Date();
-  await split.save();
-
-  // Check if ALL splits for this booking are now paid
-  const allSplits = await BookingSplit.find({ bookingID });
-  const allPaid = allSplits.every((s) => s.status === 'paid');
-
-  if (allPaid) {
-    // CRITICAL: Auto-confirm booking when all friends have paid
-    booking.status = 'confirmed';
-    booking.rentalState = 'scheduled';
-    await booking.save();
-  }
-
-  return {
-    split,
-    allPaid,
-    bookingStatus: booking.status,
   };
 };

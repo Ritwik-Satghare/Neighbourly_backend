@@ -175,8 +175,13 @@ export const cancelBooking = async (bookingID: string, userID: string) => {
 /**
  * Update booking status.
  * Only the listing owner can update status (confirm / complete).
+ *
+ * // ─── Rental Lifecycle ──────────────────────────────────────────────
+ * // Tracks the physical rental state, separate from booking status.
+ * // null until payment is completed; set to 'scheduled' after payment verification.
+ *
  * Valid transitions:
- *   pending → confirmed  (also sets rentalState = 'scheduled')
+ *   pending → confirmed
  *   confirmed → completed (requires rentalState = 'returned')
  */
 export const updateBookingStatus = async (
@@ -213,8 +218,8 @@ export const updateBookingStatus = async (
 
   // ─── Lifecycle integration ───────────────────────────────────────
   if (newStatus === 'confirmed') {
-    // Confirming a booking initializes the rental lifecycle
-    booking.rentalState = 'scheduled';
+    // Owner approval only. rentalState stays null until payment is completed.
+    // Payment verification (payment_service.verifyPayment) will set rentalState = 'scheduled'.
   }
 
   if (newStatus === 'completed') {

@@ -55,7 +55,7 @@ const bookingSchema: Schema = new Schema(
     },
     // ─── Rental Lifecycle ──────────────────────────────────────────────
     // Tracks the physical rental state, separate from booking status.
-    // null for pending/cancelled bookings; set to 'scheduled' on confirmation.
+    // null until payment is completed; set to 'scheduled' after payment verification.
     rentalState: {
       type: String,
       enum: ['scheduled', 'checked_out', 'returned'],

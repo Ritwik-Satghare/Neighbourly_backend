@@ -19,12 +19,4 @@ router.post(
 // GET /split/:bookingID — Get split payment details for a booking
 router.get('/:bookingID', splitController.getSplitsByBooking);
 
-// POST /split/pay — Pay your share of a split
-// Body: { bookingID }
-router.post(
-  '/pay',
-  validateRequest(splitController.payShareSchema),
-  splitController.payShare
-);
-
 export default router;

@@ -3,8 +3,9 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 export interface ITransaction extends Document {
   userID: Types.ObjectId;
   bookingID: Types.ObjectId;
+  splitID?: Types.ObjectId;
   amount: number;
-  type: 'booking_payment' | 'split_payment' | 'refund';
+  paymentType: 'booking' | 'split';
   status: 'pending' | 'completed' | 'failed';
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
@@ -26,14 +27,21 @@ const transactionSchema: Schema = new Schema(
       required: true,
       index: true,
     },
+    // Links to the specific split record (only for paymentType = 'split')
+    splitID: {
+      type: Schema.Types.ObjectId,
+      ref: 'BookingSplit',
+      default: null,
+    },
     amount: {
       type: Number,
       required: true,
       min: [0, 'Amount must be positive'],
     },
-    type: {
+    // Determines what business action to execute after payment verification
+    paymentType: {
       type: String,
-      enum: ['booking_payment', 'split_payment', 'refund'],
+      enum: ['booking', 'split'],
       required: true,
     },
     status: {

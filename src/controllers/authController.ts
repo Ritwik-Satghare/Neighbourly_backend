@@ -63,6 +63,7 @@ export const sendOTP = async (req: Request, res: Response) => {
     });
 
     try {
+      console.log(process.env.EMAIL_USER);
       // Attempt real SMTP email delivery
       await sendEmail(
         user.email,
@@ -73,7 +74,7 @@ export const sendOTP = async (req: Request, res: Response) => {
       return res.json({ message: "OTP sent to email", code });
 
     } catch (emailError: any) {
-      // 💡 FAIL-SAFE BYPASS: Log email error to Render console, but don't return a 500 error to client
+      //FAIL-SAFE BYPASS: Log email error to Render console, but don't return a 500 error to client
       console.error("Render SMTP Delivery failed. Error details:", emailError?.message || emailError);
 
       return res.json({ 

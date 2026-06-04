@@ -5,18 +5,26 @@ import { validateRequest } from '../middlewares/validation_middleware';
 
 const router = Router();
 
-// POST /payment/create — Create a Razorpay payment order
+// POST /payment/booking — Create Razorpay order for full booking payment (renter only)
 router.post(
-  '/create',
+  '/booking',
   authenticateJWT,
-  validateRequest(paymentController.createPaymentSchema),
-  paymentController.createPayment
+  validateRequest(paymentController.createBookingPaymentSchema),
+  paymentController.createBookingPayment
 );
 
-// POST /payment/webhook — Verify Razorpay payment (called by client after payment)
+// POST /payment/split — Create Razorpay order for a split share (split participant only)
 router.post(
-  '/webhook',
-  paymentController.paymentWebhook
+  '/split',
+  authenticateJWT,
+  validateRequest(paymentController.createSplitPaymentSchema),
+  paymentController.createSplitPayment
+);
+
+// POST /payment/verify — Verify Razorpay payment and trigger business side effects
+router.post(
+  '/verify',
+  paymentController.verifyPayment
 );
 
 // GET /payment/history — Get payment history for authenticated user
