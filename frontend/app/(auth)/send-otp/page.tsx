@@ -2,14 +2,39 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { jwtDecode } from "jwt-decode";
+
 import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sendOtp } from "@/lib/auth";
+
+import { sendOtp, getAuthToken } from "@/lib/auth";
+
+type JwtPayload = {
+  id: string;
+  iat: number;
+  exp: number;
+};
 
 export default function SendOtpPage() {
   const router = useRouter();
+
+  useEffect(() => {
+  const token = getAuthToken();
+
+  if (!token) return;
+
+  try {
+    const decoded = jwtDecode<JwtPayload>(token);
+
+    console.log("Decoded Token:", decoded);
+
+    setUserId(decoded.id);
+  } catch (error) {
+    console.error("Token decode failed:", error);
+  }
+}, []);
 
   const [userId, setUserId] = useState("");
   const [error, setError] = useState("");
@@ -53,12 +78,10 @@ export default function SendOtpPage() {
         <Input
           label="User ID"
           name="userId"
-          onChange={(event) =>
-            setUserId(event.target.value)
-          }
-          placeholder="Enter your User ID"
+          placeholder="User ID"
           required
           value={userId}
+          readOnly
         />
 
         {error ? (

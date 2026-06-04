@@ -1,5 +1,7 @@
 "use client";
 
+import { jwtDecode } from "jwt-decode";
+
 export const AUTH_TOKEN_KEY = "neighbourly.authToken";
 export const AUTH_USER_KEY = "neighbourly.user";
 const AUTH_EVENT = "neighbourly-auth-change";
@@ -215,4 +217,31 @@ export async function verifyOtp(
   }
 
   return payload;
+}
+
+type JwtPayload = {
+  userId?: string;
+  id?: string;
+  _id?: string;
+};
+
+export function getUserIdFromToken() {
+  const token = getAuthToken();
+
+  if (!token) return null;
+
+  try {
+    const decoded = jwtDecode<JwtPayload>(token);
+
+    console.log("Decoded Token:", decoded);
+
+    return (
+      decoded.userId ||
+      decoded.id ||
+      decoded._id ||
+      null
+    );
+  } catch {
+    return null;
+  }
 }
