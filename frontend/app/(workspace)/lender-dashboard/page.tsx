@@ -31,16 +31,23 @@ export default function LenderDashboardPage() {
 
       const response = await getUserListings(currentId);
       
-      const mapped = response.listings.map((item: any) => ({
-        id: item.id ?? item._id ?? String(Math.random()),
-        title: item.title ?? item.name ?? "",
-        pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
-        status: item.status ?? "Active",
-        image: item.image ?? item.images?.[0] ?? "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80",
-        category: item.category ?? "Tools",
-        summary: item.summary ?? item.description ?? "",
-        requests: item.requests ?? 0,
-      }));
+      const mapped = response.listings.map((item: any) => {
+        const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+        const chosenField = item.image ? 'image' : item.images?.[0] ? 'images[0]' : item.imageUrl ? 'imageUrl' : item.imageURLs?.[0] ? 'imageURLs[0]' : 'fallback';
+        const image = item.image ?? item.images?.[0] ?? item.imageUrl ?? item.imageURLs?.[0] ?? FALLBACK_IMAGE;
+        try { console.log(`[lender listing image source] ${item.id ?? item._id ?? 'unknown'} -> ${chosenField}`); } catch (e) {}
+
+        return {
+          id: item.id ?? item._id ?? String(Math.random()),
+          title: item.title ?? item.name ?? "",
+          pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
+          status: item.status ?? "Active",
+          image: image,
+          category: item.category ?? "Tools",
+          summary: item.summary ?? item.description ?? "",
+          requests: item.requests ?? 0,
+        } as UserListing;
+      });
 
       setUserListings(mapped);
     } catch (err: any) {

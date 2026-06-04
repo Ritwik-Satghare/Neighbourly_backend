@@ -5,6 +5,10 @@ import type { Listing } from "@/lib/data";
 import { formatCurrency } from "@/lib/utils";
 
 export function ListingCard({ listing }: { listing: Listing }) {
+  const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1504148455328-c376907d081c";
+  const imageSrc =
+    listing.image || listing.images?.[0] || (listing as any).imageUrl || (listing as any).imageURLs?.[0] || FALLBACK_IMAGE;
+
   return (
     <Link
       className="group w-full h-full rounded-xl bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1"
@@ -17,7 +21,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
             className="object-cover transition duration-500 group-hover:scale-105"
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            src={listing.image}
+            src={imageSrc}
           />
           {listing.badge ? (
             <span className="absolute right-3 top-3 rounded-full bg-surface/90 px-3 py-1 text-xs font-semibold text-primary">

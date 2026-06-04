@@ -3,25 +3,84 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-"use client";
-
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { OwnerListingCard } from "@/components/owner-listing-card";
 import { PageHeader } from "@/components/page-header";
 import { StatsCard } from "@/components/stats-card";
-import { listings, stats, userListings } from "@/lib/data";
+import { stats } from "@/lib/data";
+import type { UserListing } from "@/lib/data";
+import { EmptyState } from "@/components/empty-state";
+import { getUserListings, deleteListing } from "@/lib/api";
+import { getStoredUser, getCurrentUserId } from "@/lib/auth";
 
 import { getBookings } from "@/services/booking";
 
 export default function DashboardPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const [userListings, setUserListings] = useState<UserListing[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const currentUser = getStoredUser();
+
+  const loadListings = async () => {
+  setIsLoading(true);
+
+  try {
+    const currentTokenId = getCurrentUserId();
+    const currentId = currentTokenId ?? currentUser?.id ?? currentUser?._id;
+
+    if (!currentId) {
+      throw new Error("Please log in to view your listings.");
+    }
+
+    const response = await getUserListings(currentId);
+
+    const listingsData = response?.listings ?? [];
+    const mapped = listingsData.map((item: any) => {
+      const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+      const chosenField = item.image ? 'image' : item.images?.[0] ? 'images[0]' : item.imageUrl ? 'imageUrl' : item.imageURLs?.[0] ? 'imageURLs[0]' : 'fallback';
+      const image = item.image ?? item.images?.[0] ?? item.imageUrl ?? item.imageURLs?.[0] ?? FALLBACK_IMAGE;
+      try { console.log(`[user listing image source] ${item.id ?? item._id ?? 'unknown'} -> ${chosenField}`); } catch (e) {}
+
+      return {
+        id: item.id ?? item._id ?? String(Math.random()),
+        title: item.title ?? item.name ?? "",
+        pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
+        status: item.status ?? "Active",
+        image: image,
+        category: item.category ?? "Tools",
+        summary: item.summary ?? item.description ?? "",
+        requests: item.requests ?? 0,
+      } as UserListing;
+    });
+
+    setUserListings(mapped);
+  } catch {
+    setUserListings([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const handleDelete = async (id: string) => {
+  if (!confirm("Are you sure you want to delete this listing?")) {
+    return;
+  }
+
+  try {
+    await deleteListing(id);
+    setUserListings((curr) => curr.filter((l) => l.id !== id));
+  } catch (err: any) {
+    alert(err.message ?? "Failed to delete listing");
+  }
+};
 
   useEffect(() => {
     const loadBookings = async () => {
-      setError(null);
+      setBookingError(null);
       setLoading(true);
 
       try {
@@ -35,7 +94,7 @@ export default function DashboardPage() {
 
         setBookings(items);
       } catch (err) {
-        setError((err as Error)?.message ?? "Unable to load bookings.");
+        setBookingError((err as Error)?.message ?? "Unable to load bookings.");
       } finally {
         setLoading(false);
       }
@@ -43,6 +102,10 @@ export default function DashboardPage() {
 
     loadBookings();
   }, []);
+
+  useEffect(() => {
+  loadListings();
+}, []);
 
   return (
     <div className="grid w-full gap-10">
@@ -69,6 +132,9 @@ export default function DashboardPage() {
             <Button href="/messages" variant="secondary">
               Open inbox
             </Button>
+            <Button href="/my-reviews" variant="secondary">
+              My reviews
+            </Button>
           </div>
         </div>
 
@@ -76,9 +142,9 @@ export default function DashboardPage() {
           <div className="rounded-3xl border border-dashed border-ink-soft/20 bg-white p-8 text-center text-sm text-ink-soft">
             Loading bookings…
           </div>
-        ) : error ? (
+        ) : bookingError ? (
           <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-900">
-            {error}
+            {bookingError}
           </div>
         ) : bookings.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-ink-soft/20 bg-white p-8 text-center text-sm text-ink-soft">
@@ -126,10 +192,6 @@ export default function DashboardPage() {
         {isLoading ? (
           <div className="flex min-h-40 items-center justify-center text-ink-soft">
             <span>Loading listings...</span>
-          </div>
-        ) : error ? (
-          <div className="flex min-h-40 items-center justify-center text-tertiary">
-            <span>{error}</span>
           </div>
         ) : userListings.length === 0 ? (
           <EmptyState

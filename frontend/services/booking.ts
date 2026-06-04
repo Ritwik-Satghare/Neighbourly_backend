@@ -1,7 +1,7 @@
 import { getAuthToken } from "@/lib/auth";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/api";
 
 async function fetchWithAuth(path: string, options: RequestInit = {}) {
   const token = getAuthToken();
@@ -42,16 +42,15 @@ export const getBookingById = async (bookingId: string) => {
 };
 
 export const confirmOrCompleteBooking = async (
-  bookingId: string
+  bookingId: string,
+  payload?: Record<string, unknown>
 ) => {
   return fetchWithAuth(`/booking/status/${bookingId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      status: "completed",
-    }),
+    body: payload ? JSON.stringify(payload) : undefined,
   });
 };
 

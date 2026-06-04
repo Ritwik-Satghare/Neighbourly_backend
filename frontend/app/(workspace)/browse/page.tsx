@@ -33,22 +33,26 @@ export default function BrowsePage() {
         // Map backend listings to frontend UI structure
         const listingsArray = response.listings ?? [];
 
-const mappedListings: Listing[] = listingsArray.map((item: any) => ({
-  id: item.id ?? item._id ?? String(Math.random()),
-  title: item.title ?? item.name ?? "",
-  category: item.category ?? "Tools",
-  distance: item.distance ?? "0.8km away",
-  pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
-  rating: item.rating ?? 4.9,
-  trustScore: item.trustScore ?? item.trust_score ?? 98,
-  image:
-    item.image ??
-    item.images?.[0] ??
-    "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80",
-  summary: item.summary ?? item.description ?? "",
-  host: item.host ?? "Neighbor",
-  badge: item.badge,
-}));
+const mappedListings: Listing[] = listingsArray.map((item: any) => {
+  const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+  const chosenField = item.image ? 'image' : item.images?.[0] ? 'images[0]' : item.imageUrl ? 'imageUrl' : item.imageURLs?.[0] ? 'imageURLs[0]' : 'fallback';
+  const image = item.image ?? item.images?.[0] ?? item.imageUrl ?? item.imageURLs?.[0] ?? FALLBACK_IMAGE;
+  try { console.log(`[listing image source] ${item.id ?? item._id ?? 'unknown'} -> ${chosenField}`); } catch (e) {}
+
+  return {
+    id: item.id ?? item._id ?? String(Math.random()),
+    title: item.title ?? item.name ?? "",
+    category: item.category ?? "Tools",
+    distance: item.distance ?? "0.8km away",
+    pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
+    rating: item.rating ?? 4.9,
+    trustScore: item.trustScore ?? item.trust_score ?? 98,
+    image: image,
+    summary: item.summary ?? item.description ?? "",
+    host: item.host ?? "Neighbor",
+    badge: item.badge,
+  } as Listing;
+});
 
         setListings(mappedListings);
       } catch (err: any) {
