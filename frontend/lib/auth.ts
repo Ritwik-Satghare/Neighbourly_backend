@@ -8,6 +8,7 @@ const AUTH_EVENT = "neighbourly-auth-change";
 
 export type AuthUser = {
   id?: string;
+  _id?: string;
   name?: string;
   firstName?: string;
   lastName?: string;
