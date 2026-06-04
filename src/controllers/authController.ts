@@ -43,38 +43,49 @@ export const loginUser = async (req: Request, res: Response) => {
 
 
 export const sendOTP = async (req: Request, res: Response) => {
-  
   const { userId } = req.body;
-  const user = await User.findById(userId);
   
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
-
-  const code = generateOTP();
-
-  await OTP.create({
-    userID: userId,
-    code,
-    type: "email",
-    // expiresAt: new Date(2026, 5, 2, 8, 0, 0)
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-  });
-
   try {
-    await sendEmail(
-      user.email,
-      "Your OTP Code",
-      `Your verification OTP is: ${code}. It is valid for 5 minutes.`
-    );
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    res.json({ message: "OTP sent to email", code });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to send email OTP" });
+    const code = generateOTP();
+
+    // Create the verification record in MongoDB
+    await OTP.create({
+      userID: userId,
+      code,
+      type: "email",
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes validity
+    });
+
+    try {
+      // Attempt real SMTP email delivery
+      await sendEmail(
+        user.email,
+        "Your OTP Code",
+        `Your verification OTP is: ${code}. It is valid for 5 minutes.`
+      );
+
+      return res.json({ message: "OTP sent to email", code });
+
+    } catch (emailError: any) {
+      // 💡 FAIL-SAFE BYPASS: Log email error to Render console, but don't return a 500 error to client
+      console.error("Render SMTP Delivery failed. Error details:", emailError?.message || emailError);
+
+      return res.json({ 
+        message: "OTP generated successfully (Email delivery failed, using testing bypass)", 
+        code 
+      });
+    }
+
+  } catch (error: any) {
+    return res.status(500).json({ message: "Internal server error", error: error.message });
   }
-  console.log('sent email')
 };
-
 
 
 export const verifyOTP = async (req: Request, res: Response) => {
