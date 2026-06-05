@@ -74,6 +74,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+// Look for your routes section in src/app.ts and update it to look like this:
 app.use('/auth', authRoutes);
 app.use('/listing', listingRoutes);
 app.use('/offer', offerRoutes);
@@ -83,8 +84,9 @@ app.use('/payment', paymentRoutes);
 app.use('/conversation', conversationRoutes);
 app.use('/message', messageRoutes);
 app.use('/review', reviewRoutes);
-// Booking condition phase-1 routes (new)
-app.use('/api/bookings', bookingConditionRoutes);
+
+// FIX: Change the prefix from '/api/bookings' to '/booking' so it hits your proven routing tree seamlessly!
+app.use('/booking', bookingConditionRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
