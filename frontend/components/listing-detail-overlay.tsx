@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
-import { getStoredUser, getCurrentUserId } from "@/lib/auth";
+import { getStoredUser } from "@/lib/auth";
 import { listings as mockListings } from "@/lib/data";
 import type { Listing } from "@/lib/data";
 import { createBookingMock } from "@/services/booking";
@@ -190,18 +190,6 @@ export default function ListingDetailOverlay({ item, onClose }: ListingDetailOve
                   {bookingMessage}
                 </div>
               )}
-              {bookingStatus === "success" && (
-                <Button
-                  className="w-full justify-center"
-                  onClick={() => {
-                    const ownerId = (item as any).ownerId ?? (item as any).userId ?? (item as any).owner ?? "";
-                    onClose();
-                    router.push(`/messages?userId=${ownerId}`);
-                  }}
-                >
-                  💬 Message Owner
-                </Button>
-              )}
               {bookingStatus === "error" && (
                 <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800">
                   {bookingMessage}
@@ -223,6 +211,19 @@ export default function ListingDetailOverlay({ item, onClose }: ListingDetailOve
                     : bookingStatus === "success"
                     ? "Request sent ✓"
                     : "Request to Rent"}
+                </Button>
+              )}
+
+              {bookingStatus === "success" && (
+                <Button
+                  className="w-full justify-center"
+                  onClick={() => {
+                    const ownerId = (item as any).ownerId ?? (item as any).userId ?? (item as any).owner ?? "";
+                    onClose();
+                    router.push(`/messages?userId=${ownerId}`);
+                  }}
+                >
+                  💬 Message Owner
                 </Button>
               )}
 

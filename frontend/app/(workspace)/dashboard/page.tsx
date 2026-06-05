@@ -148,44 +148,63 @@ export default function DashboardPage() {
           <div className="rounded-3xl border border-dashed border-ink-soft/20 bg-white p-8 text-center text-sm text-ink-soft">No bookings yet.</div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {bookings.map((booking) => (
-              <div key={booking._id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-ink-soft">Booking ID</p>
-                      <p className="mt-2 text-sm font-semibold text-ink-strong">{booking._id}</p>
+            {bookings.map((booking) => {
+              const isPaymentRequired =
+                booking.rawStatus === "confirmed" && booking.rentalState == null;
+
+              return (
+                <div key={booking._id} className={`rounded-3xl border bg-white p-6 shadow-sm flex flex-col justify-between ${isPaymentRequired ? "border-primary/30 ring-1 ring-primary/10" : "border-slate-200"}`}>
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-ink-soft">Booking</p>
+                      </div>
+                      {isPaymentRequired && (
+                        <span className="rounded-full bg-primary-fixed px-3 py-1 text-xs font-semibold text-primary">
+                          Payment Required
+                        </span>
+                      )}
+                      {!isPaymentRequired && booking.status === "active" && (
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                          Accepted
+                        </span>
+                      )}
+                      {booking.status === "pending" && (
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                          Pending
+                        </span>
+                      )}
                     </div>
-                    {booking.status === "active" && (
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                        Accepted
-                      </span>
-                    )}
-                    {booking.status === "pending" && (
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                        Pending
-                      </span>
+                    <p className="mt-4 font-headline text-lg font-bold text-ink-strong">{booking.itemTitle}</p>
+                    {isPaymentRequired && (
+                      <p className="mt-2 text-xs text-primary font-medium">
+                        Owner confirmed — pay to schedule your rental.
+                      </p>
                     )}
                   </div>
-                  <p className="mt-4 font-headline text-lg font-bold text-ink-strong">{booking.itemTitle}</p>
-                </div>
-                <div className="mt-6 flex justify-between items-center border-t border-slate-100 pt-4">
-                  <p className="text-sm font-semibold text-primary">${booking.pricePerDay} / day</p>
-                  <div className="flex gap-2">
-                    {booking.status === "active" && (
-                      <Button 
-                        variant="secondary" 
-                        size="sm"
-                        onClick={() => router.push(`/messages?userId=${booking.ownerId}`)}
-                      >
-                        Message Owner
-                      </Button>
-                    )}
-                    <Button variant="secondary" size="sm">Details</Button>
+                  <div className="mt-6 flex justify-between items-center border-t border-slate-100 pt-4">
+                    <p className="text-sm font-semibold text-primary">
+                      {booking.totalPrice != null ? `₹${booking.totalPrice}` : `$${booking.pricePerDay} / day`}
+                    </p>
+                    <div className="flex gap-2">
+                      {booking.status === "active" && (
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => router.push(`/messages?userId=${booking.ownerId}`)}
+                        >
+                          Message Owner
+                        </Button>
+                      )}
+                      <Button variant="secondary" size="sm" href={`/booking/${booking._id}`}>Details</Button>
+                      {isPaymentRequired && (
+                        <Button size="sm" href={`/booking/${booking._id}`}>Pay</Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

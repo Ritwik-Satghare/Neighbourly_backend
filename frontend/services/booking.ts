@@ -21,12 +21,42 @@ export interface MockBooking {
   createdAt: string;
   startDate?: string;
   endDate?: string;
+  // Raw backend fields for payment/split logic
+  rawStatus?: "pending" | "confirmed" | "cancelled" | "completed";
+  rentalState?: "scheduled" | "checked_out" | "returned" | null;
+  totalPrice?: number;
+  rawBookingId?: string;
 }
 
 function getMockBookings(): MockBooking[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(MOCK_STORAGE_KEY) || "[]");
+    const data = localStorage.getItem(MOCK_STORAGE_KEY);
+    if (!data || data === "[]") {
+      const defaultBookings: MockBooking[] = [
+        {
+          _id: "mock_playstation5",
+          listingId: "ooni-koda",
+          itemTitle: "Ooni Koda 16 Pizza Oven",
+          itemImage: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80",
+          requesterId: "mockRequester",
+          requesterName: "Mock User",
+          ownerId: "nina-brooks",
+          status: "active",
+          pricePerDay: 35,
+          createdAt: new Date().toISOString(),
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          rawStatus: "confirmed",
+          rentalState: null, // Unpaid
+          totalPrice: 105,
+          rawBookingId: "mock_playstation5"
+        }
+      ];
+      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(defaultBookings));
+      return defaultBookings;
+    }
+    return JSON.parse(data);
   } catch {
     return [];
   }
@@ -93,7 +123,9 @@ export const getBookings = async (role = "owner") => {
     const bookingsRes = await fetchFromBackend(`${API_BASE_URL}/booking/user?role=${role}`);
     const bookings = bookingsRes.data ?? bookingsRes ?? [];
 
-    const mappedOffers: MockBooking[] = (Array.isArray(offers) ? offers : []).map((offer: any) => {
+    const mappedOffers: MockBooking[] = (Array.isArray(offers) ? offers : [])
+      .filter((offer: any) => offer.status === "pending")
+      .map((offer: any) => {
       const listingId = String(offer.listingID?._id ?? offer.listingID);
       const listing = listingMap.get(listingId);
       return {
@@ -106,7 +138,12 @@ export const getBookings = async (role = "owner") => {
         ownerId: offer.listingID?.ownerID ?? offer.listingID?.ownerId ?? listing?.ownerID ?? listing?.ownerId ?? "",
         status: offer.status === "pending" ? "pending" : (offer.status === "accepted" ? "active" : "canceled"),
         pricePerDay: Number(offer.listingID?.pricePerDay ?? listing?.pricePerDay ?? offer.amount),
-        createdAt: offer.createdAt || new Date().toISOString()
+        createdAt: offer.createdAt || new Date().toISOString(),
+        // Offers don't have booking-level payment fields
+        rawStatus: undefined,
+        rentalState: undefined,
+        totalPrice: undefined,
+        rawBookingId: undefined,
       };
     });
 
@@ -123,7 +160,14 @@ export const getBookings = async (role = "owner") => {
         ownerId: booking.listingID?.ownerID ?? booking.listingID?.ownerId ?? listing?.ownerID ?? listing?.ownerId ?? "",
         status: booking.status === "pending" ? "pending" : (booking.status === "confirmed" ? "active" : (booking.status === "completed" ? "completed" : "canceled")),
         pricePerDay: Number(booking.listingID?.pricePerDay ?? listing?.pricePerDay ?? booking.totalPrice),
-        createdAt: booking.createdAt || new Date().toISOString()
+        createdAt: booking.createdAt || new Date().toISOString(),
+        // Raw backend fields for payment/split logic
+        rawStatus: booking.status,
+        rentalState: booking.rentalState ?? null,
+        totalPrice: booking.totalPrice != null ? Number(booking.totalPrice) : undefined,
+        rawBookingId: String(booking._id),
+        startDate: booking.startDate,
+        endDate: booking.endDate,
       };
     });
 
@@ -198,7 +242,14 @@ export const getBookingById = async (bookingId: string) => {
         ownerId: booking.listingID?.ownerID ?? booking.listingID?.ownerId ?? listing?.ownerID ?? listing?.ownerId ?? "",
         status: booking.status === "pending" ? "pending" : (booking.status === "confirmed" ? "active" : (booking.status === "completed" ? "completed" : "canceled")),
         pricePerDay: Number(booking.listingID?.pricePerDay ?? listing?.pricePerDay ?? booking.totalPrice),
-        createdAt: booking.createdAt || new Date().toISOString()
+        createdAt: booking.createdAt || new Date().toISOString(),
+        // Raw backend fields for payment/split logic
+        rawStatus: booking.status,
+        rentalState: booking.rentalState ?? null,
+        totalPrice: booking.totalPrice != null ? Number(booking.totalPrice) : undefined,
+        rawBookingId: String(booking._id),
+        startDate: booking.startDate,
+        endDate: booking.endDate,
       };
     }
   } catch (error) {
@@ -280,6 +331,14 @@ export const confirmOrCompleteBooking = async (
     if (index === -1) throw new Error("Booking not found");
     
     allBookings[index].status = newStatus;
+    if (newStatus === "active") {
+      allBookings[index].rawStatus = "confirmed";
+      allBookings[index].rentalState = null;
+    } else if (newStatus === "completed") {
+      allBookings[index].rawStatus = "completed";
+      allBookings[index].rentalState = "returned";
+    }
+
     saveMockBookings(allBookings);
     return allBookings[index];
   }
@@ -345,4 +404,24 @@ export const cancelBooking = async (bookingId: string) => {
     saveMockBookings(allBookings);
     return allBookings[index];
   }
+};
+
+/**
+ * Mark item as handed over to renter (owner only).
+ * PATCH /booking/start/:id → rentalState = checked_out
+ */
+export const startRental = async (bookingId: string) => {
+  const realId = bookingId.replace("booking_", "").replace("offer_", "");
+  const res = await fetchFromBackend(`${API_BASE_URL}/booking/start/${realId}`, "PATCH");
+  return res.data ?? res;
+};
+
+/**
+ * Mark item as returned by renter (owner only).
+ * PATCH /booking/return/:id → rentalState = returned
+ */
+export const returnRental = async (bookingId: string) => {
+  const realId = bookingId.replace("booking_", "").replace("offer_", "");
+  const res = await fetchFromBackend(`${API_BASE_URL}/booking/return/${realId}`, "PATCH");
+  return res.data ?? res;
 };
