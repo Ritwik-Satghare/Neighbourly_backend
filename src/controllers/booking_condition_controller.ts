@@ -22,12 +22,12 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // Normalized lookup across all common API client naming patterns
+    // Safely look up the booking ID across all common naming patterns
     const bookingId = req.params.bookingId || req.body.bookingId || req.body.bookingID;
     const { stage } = req.body as { stage?: 'before' | 'after' };
 
     if (!bookingId) {
-      res.status(400).json({ success: false, message: 'bookingId payload parameter is required' });
+      res.status(400).json({ success: false, message: 'bookingId parameter is required' });
       return;
     }
     if (!stage || (stage !== 'before' && stage !== 'after')) {
@@ -35,7 +35,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // Robust file extraction supporting both .array() and .any() configurations
+    // Extract files dynamically from Multer's different possible parsing behaviors (.array() or .any())
     let files: Express.Multer.File[] = [];
     if (Array.isArray(req.files)) {
       files = req.files;
@@ -46,7 +46,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
     }
 
     if (!files || files.length === 0) {
-      res.status(400).json({ success: false, message: 'No image file discovered under the specified multipart key.' });
+      res.status(400).json({ success: false, message: 'No files uploaded. Make sure your Postman file key is named exactly "images".' });
       return;
     }
 
@@ -54,6 +54,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
     for (const f of files) {
       let uploadTarget: string;
 
+      // Convert buffer to Base64 Data URI string for memoryStorage setups
       if (f.buffer) {
         const base64Data = f.buffer.toString('base64');
         uploadTarget = `data:${f.mimetype};base64,${base64Data}`;
@@ -69,6 +70,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
         uploadedUrls.push(anyResp.secure_url || anyResp.url);
       }
 
+      // Local diskStorage cleanup fallback
       if (f.path && fs.existsSync(f.path)) {
         try {
           fs.unlinkSync(f.path);
@@ -79,50 +81,57 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
     }
 
     if (uploadedUrls.length === 0) {
-      res.status(500).json({ success: false, message: 'Cloudinary transmission failed to register structural assets.' });
+      res.status(500).json({ success: false, message: 'Failed to upload images to Cloudinary.' });
       return;
     }
 
+    // Google Gemini Image Quality Pipeline Isolation Boundary
     let aiResult;
     try {
       aiResult = await validateImageQuality(uploadedUrls);
     } catch (aiErr) {
-      console.error('AI execution boundary bypassed, logging default pass state:', aiErr);
+      console.error('AI validation error, proceeding with default pass flags:', aiErr);
       aiResult = { accepted: true, qualityScore: 1.0, reason: undefined };
     }
 
+    // If Gemini explicitly rejects the image quality, rollback the Cloudinary uploads
     if (!aiResult.accepted) {
       for (const url of uploadedUrls) {
         try {
           const publicId = extractPublicId(url);
           if (publicId) await deleteFromCloudinary(publicId);
         } catch (delErr) {
-          console.error('Rollback cleanup tracking failure:', delErr);
+          console.error('Failed to delete Cloudinary image during rollback:', delErr);
         }
       }
-      res.status(400).json({ success: false, message: aiResult.reason || 'Image quality validation rejected by Gemini pipeline.' });
+      res.status(400).json({ success: false, message: aiResult.reason || 'Image validation failed' });
       return;
     }
 
+    // 🟢 CRITICAL SYNC: Explicitly passing fields to match what your Mongoose validation needs
     const record = await bookingConditionService.uploadConditionImages(
       bookingId,
       userID,
       stage,
-      uploadedUrls,
-      { accepted: aiResult.accepted, qualityScore: aiResult.qualityScore, reason: aiResult.reason }
+      uploadedUrls, // Passing the full array down to the service layer
+      { 
+        accepted: aiResult.accepted, 
+        qualityScore: aiResult.qualityScore, 
+        reason: aiResult.reason 
+      }
     );
 
     res.status(201).json({ success: true, data: record });
   } catch (error: any) {
-    console.error("CRITICAL EXCEPTION IN UPLOAD CONTROLLER:", error);
+    console.error("CRITICAL EXCEPTION IN UPLOAD PIPELINE:", error);
     if (error.message && error.message.includes('Forbidden')) {
       res.status(403).json({ success: false, message: error.message });
       return;
     }
     res.status(500).json({ 
       success: false, 
-      message: 'Internal processing failure caught in isolation context.',
-      debug: error.message || error
+      message: "Internal processing failure caught in isolation context.",
+      debugDetails: error.message || error 
     });
   }
 };
