@@ -22,7 +22,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // Safely look up the booking ID across all common naming patterns
+    // Lookup across all common naming patterns
     const bookingId = req.params.bookingId || req.body.bookingId || req.body.bookingID;
     const { stage } = req.body as { stage?: 'before' | 'after' };
 
@@ -35,7 +35,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // Extract files dynamically from Multer's different possible parsing behaviors (.array() or .any())
+    // Extract files dynamically from Multer's possible parsing formats
     let files: Express.Multer.File[] = [];
     if (Array.isArray(req.files)) {
       files = req.files;
@@ -46,7 +46,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
     }
 
     if (!files || files.length === 0) {
-      res.status(400).json({ success: false, message: 'No files uploaded. Make sure your Postman file key is named exactly "images".' });
+      res.status(400).json({ success: false, message: 'No files uploaded. Check your Postman key name.' });
       return;
     }
 
@@ -54,7 +54,6 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
     for (const f of files) {
       let uploadTarget: string;
 
-      // Convert buffer to Base64 Data URI string for memoryStorage setups
       if (f.buffer) {
         const base64Data = f.buffer.toString('base64');
         uploadTarget = `data:${f.mimetype};base64,${base64Data}`;
@@ -70,12 +69,11 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
         uploadedUrls.push(anyResp.secure_url || anyResp.url);
       }
 
-      // Local diskStorage cleanup fallback
       if (f.path && fs.existsSync(f.path)) {
         try {
           fs.unlinkSync(f.path);
         } catch (err) {
-          console.error('Temporary file cleanup deferred:', err);
+          console.error('Temp file cleanup deferred:', err);
         }
       }
     }
@@ -85,76 +83,48 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // Google Gemini Image Quality Pipeline Isolation Boundary
+    // Gemini Quality Pipeline Integration
     let aiResult;
     try {
       aiResult = await validateImageQuality(uploadedUrls);
     } catch (aiErr) {
-      console.error('AI validation error, proceeding with default pass flags:', aiErr);
+      console.error('AI verification bypassed, logging pass fallback:', aiErr);
       aiResult = { accepted: true, qualityScore: 1.0, reason: undefined };
     }
 
-    // If Gemini explicitly rejects the image quality, rollback the Cloudinary uploads
     if (!aiResult.accepted) {
       for (const url of uploadedUrls) {
         try {
           const publicId = extractPublicId(url);
           if (publicId) await deleteFromCloudinary(publicId);
         } catch (delErr) {
-          console.error('Failed to delete Cloudinary image during rollback:', delErr);
+          console.error('Cloudinary rollback failed:', delErr);
         }
       }
       res.status(400).json({ success: false, message: aiResult.reason || 'Image validation failed' });
       return;
     }
 
-    // 🟢 SAFE SYNC HACK: We grab the raw string link out of the array right here.
-    // This explicitly prevents Mongoose from running into path validation errors.
-    const primaryImageUrl = uploadedUrls[0];
-
-    // Check your service's function declaration signature on the fly
-    const serviceFunc = bookingConditionService.uploadConditionImages as any;
-    let record;
-
-    try {
-      // Execute the save to MongoDB Atlas
-      record = await serviceFunc(
-        bookingId,
-        userID,
-        stage,
-        primaryImageUrl, // Passes the explicit string to fill the schema's 'imageURL' path requirement
-        { 
-          accepted: aiResult.accepted, 
-          qualityScore: aiResult.qualityScore, 
-          reason: aiResult.reason 
-        }
-      );
-    } catch (dbErr: any) {
-      // Fallback fallback: if your service explicitly expects the full array instead of a string
-      if (dbErr.message && dbErr.message.includes('validation failed')) {
-        record = await serviceFunc(
-          bookingId,
-          userID,
-          stage,
-          uploadedUrls, 
-          { accepted: aiResult.accepted, qualityScore: aiResult.qualityScore, reason: aiResult.reason }
-        );
-      } else {
-        throw dbErr;
+    // Pass the raw array down to our safe service wrapper
+    const record = await bookingConditionService.uploadConditionImages(
+      bookingId,
+      userID,
+      stage,
+      uploadedUrls, 
+      { 
+        accepted: aiResult.accepted, 
+        qualityScore: aiResult.qualityScore, 
+        reason: aiResult.reason 
       }
-    }
+    );
 
     res.status(201).json({ success: true, data: record });
   } catch (error: any) {
-    console.error("CRITICAL EXCEPTION IN UPLOAD PIPELINE:", error);
-    if (error.message && error.message.includes('Forbidden')) {
-      res.status(403).json({ success: false, message: error.message });
-      return;
-    }
+    console.error("CRITICAL EXCEPTION IN UPLOAD CONTROLLER:", error);
     res.status(500).json({ 
       success: false, 
       message: "Internal processing failure caught in isolation context.",
-      debug: error.message || error 
+      debugDetails: error.message || error 
     });
   }
 };
@@ -176,10 +146,6 @@ export const getConditionImages = async (req: AuthRequest, res: Response): Promi
     const data = await bookingConditionService.getBookingConditions(bookingId, userID);
     res.status(200).json({ success: true, data });
   } catch (error: any) {
-    if (error.message && error.message.includes('Forbidden')) {
-      res.status(403).json({ success: false, message: error.message });
-      return;
-    }
     res.status(400).json({ success: false, message: error.message || 'Error fetching conditions' });
   }
 };
