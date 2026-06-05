@@ -5,13 +5,20 @@ import multer from 'multer';
 
 const router = Router();
 
-// FIX: Swapped from local disk storage to memory storage to prevent permission errors on Render
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// POST /api/bookings/:bookingId/condition
+// Path A: Matches flat structure -> /booking/upload-condition
+router.post(
+  '/upload-condition', 
+  authenticateJWT, 
+  upload.array('images', 5), 
+  bookingConditionController.uploadConditionImage
+);
+
+// Path B: Matches dynamic parameter structure -> /booking/:bookingId/condition
 router.post(
   '/:bookingId/condition', 
   authenticateJWT, 
@@ -19,7 +26,7 @@ router.post(
   bookingConditionController.uploadConditionImage
 );
 
-// GET /api/bookings/:bookingId/condition
+// GET Handler
 router.get(
   '/:bookingId/condition', 
   authenticateJWT, 
