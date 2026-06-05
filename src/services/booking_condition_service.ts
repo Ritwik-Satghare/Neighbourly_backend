@@ -11,7 +11,7 @@ export const uploadConditionImages = async (
   bookingID: string,
   userID: string,
   stage: 'before' | 'after',
-  imageUrls: string | string[], // Gracefully handles a string or an array from the controller
+  imageUrls: string[], // Expects the array from the controller
   aiReview: AIResult
 ) => {
   const booking = await Booking.findById(bookingID).populate('listingID');
@@ -36,23 +36,18 @@ export const uploadConditionImages = async (
     throw new Error('Cannot upload "before" images for a completed booking');
   }
 
-  // 🟢 THE FIX: Guarantee a single string value exists for the strict imageURL path
-  let singleStringUrl = '';
-  if (typeof imageUrls === 'string') {
-    singleStringUrl = imageUrls;
-  } else if (Array.isArray(imageUrls) && imageUrls.length > 0) {
-    singleStringUrl = imageUrls[0];
-  }
+  // 🟢 SAFE EXTRACTION: Grab the string link out of the array for Mongoose
+  const singleStringUrl = Array.isArray(imageUrls) && imageUrls.length > 0 ? imageUrls[0] : '';
 
   if (!singleStringUrl) {
-    throw new Error('Mongoose Validation Guard: No valid asset URL string provided.');
+    throw new Error('Validation Guard: Image collection did not yield a valid string URL source.');
   }
 
-  // Explicitly mapping the exact key expected by bookingConditionImageSchema
+  // 🚀 DIRECT FIX: Passing 'imageURL' matching your model requirements perfectly!
   const record = await BookingConditionImage.create({
     bookingID,
     uploadedBy: userID,
-    imageURL: singleStringUrl, // 🚀 Directly fills the required 'imageURL' field!
+    imageURL: singleStringUrl, 
     stage,
     aiReview: {
       accepted: aiReview.accepted,
