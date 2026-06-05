@@ -30,7 +30,7 @@ export default function BookingDetailsPage() {
 
     try {
       const response = await getBookingById(bookingId);
-      const data = response.data ?? response.booking ?? response;
+      const data = response as any;
       setBooking(data.booking ?? data);
     } catch (err) {
       setError((err as Error)?.message ?? "Unable to load booking details.");

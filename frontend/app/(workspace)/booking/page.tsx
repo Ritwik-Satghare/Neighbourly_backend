@@ -17,14 +17,8 @@ export default function BookingPage() {
       setLoading(true);
 
       try {
-        const response = await getBookings();
-        const payload = response.data;
-        const items = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.bookings)
-          ? payload.bookings
-          : [];
-        setBookings(items);
+        const items = await getBookings();
+        setBookings(Array.isArray(items) ? items : []);
       } catch (err: unknown) {
         setError((err as Error)?.message ?? "Unable to load bookings.");
       } finally {

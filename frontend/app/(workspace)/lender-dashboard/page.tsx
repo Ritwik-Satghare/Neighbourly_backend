@@ -6,15 +6,17 @@ import { OwnerListingCard } from "@/components/owner-listing-card";
 import { PageHeader } from "@/components/page-header";
 import { StatsCard } from "@/components/stats-card";
 import { EmptyState } from "@/components/empty-state";
-import { lenderActivities, lenderStats } from "@/lib/data";
+import { getBookings, MockBooking } from "@/services/booking";
 import { getUserListings, deleteListing } from "@/lib/api";
 import { getStoredUser, getCurrentUserId } from "@/lib/auth";
 import type { UserListing } from "@/lib/data";
+import { getListingImage } from "@/lib/utils";
 
 export default function LenderDashboardPage() {
   const [userListings, setUserListings] = useState<UserListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [bookings, setBookings] = useState<MockBooking[]>([]);
 
   const currentUser = getStoredUser();
 
@@ -31,30 +33,19 @@ export default function LenderDashboardPage() {
 
       const response = await getUserListings(currentId);
       
-      const listingsData = response.listings ?? [];
-      console.log("Lender listings response count:", listingsData.length);
-      const mapped = listingsData.map((item: any) => {
-        const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
-        const imageSrc =
-          item.image ??
-          item.imageUrl ??
-          item.images?.find((img: any) => img?.isPrimary)?.imageUrl ??
-          item.images?.[0]?.imageUrl ??
-          item.imageURLs?.[0] ??
-          FALLBACK_IMAGE;
-        try { console.log("Lender listing image mapping:", { id: item._id ?? item.id, name: item.name ?? item.title, resolved: imageSrc }); } catch (e) {}
+      const mapped = (response.listings ?? []).map((item: any) => ({
+        id: item.id ?? item._id ?? String(Math.random()),
+        title: item.title ?? item.name ?? "",
+        pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
+        status: item.status ?? "Active",
+        image: getListingImage(item),
+        category: item.category ?? "Tools",
+        summary: item.summary ?? item.description ?? "",
+        requests: item.requests ?? 0,
+      }));
 
-        return {
-          id: item.id ?? item._id ?? String(Math.random()),
-          title: item.title ?? item.name ?? "",
-          pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
-          status: item.status ?? "Active",
-          image: imageSrc,
-          category: item.category ?? "Tools",
-          summary: item.summary ?? item.description ?? "",
-          requests: item.requests ?? 0,
-        } as UserListing;
-      });
+      const bookingsData = await getBookings("owner");
+      setBookings(bookingsData);
 
       setUserListings(mapped);
     } catch (err: any) {
@@ -91,9 +82,10 @@ export default function LenderDashboardPage() {
       />
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {lenderStats.map((stat) => (
-          <StatsCard key={stat.label} {...stat} />
-        ))}
+        <StatsCard label="Total Earnings" value={`$${bookings.filter(b => b.status === "completed").reduce((sum, b) => sum + b.pricePerDay, 0)}`} note="From completed rentals" />
+        <StatsCard label="Active Listings" value={String(userListings.length)} note="Currently in inventory" />
+        <StatsCard label="Completed Rentals" value={String(bookings.filter(b => b.status === "completed").length)} note="All time" />
+        <StatsCard label="Pending Requests" value={String(bookings.filter(b => b.status === "pending").length)} note="Awaiting approval" />
       </section>
 
       <section className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
@@ -122,13 +114,21 @@ export default function LenderDashboardPage() {
         <div className="rounded-[2rem] bg-surface-card p-6 shadow-ambient">
           <h2 className="font-headline text-2xl font-bold text-ink-strong">Recent activity</h2>
           <div className="mt-6 grid gap-4">
-            {lenderActivities.map((activity) => (
-              <article key={activity.title} className="rounded-[1.5rem] bg-surface-low p-4">
-                <h3 className="font-semibold text-ink-strong">{activity.title}</h3>
-                <p className="mt-2 text-sm text-ink-soft">{activity.detail}</p>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">{activity.time}</p>
-              </article>
-            ))}
+            {bookings.length === 0 ? (
+               <div className="text-sm text-ink-soft">No recent activity.</div>
+            ) : (
+               bookings.slice(0, 4).map((booking) => (
+                 <article key={booking._id} className="rounded-[1.5rem] bg-surface-low p-4">
+                   <h3 className="font-semibold text-ink-strong">
+                     {booking.status === "pending" ? "New request" : booking.status === "active" ? "Booking accepted" : "Booking completed"} for {booking.itemTitle}
+                   </h3>
+                   <p className="mt-2 text-sm text-ink-soft">{booking.requesterName} • ${booking.pricePerDay}/day</p>
+                   <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                     {new Date(booking.createdAt).toLocaleDateString()}
+                   </p>
+                 </article>
+               ))
+            )}
           </div>
         </div>
       </section>

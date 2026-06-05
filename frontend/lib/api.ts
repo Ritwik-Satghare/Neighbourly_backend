@@ -2,6 +2,18 @@ import { getValidAuthToken, getCurrentUserId } from "@/lib/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/api";
 
+/** Safely extract a plain-string ID from a MongoDB document, handling ObjectId wrappers. */
+export function normaliseId(item: any): string | null {
+  const raw =
+    item?.id ??
+    item?._id?.$oid ??
+    (typeof item?._id === "string" ? item._id : null) ??
+    (item?._id ? String(item._id) : null);
+  if (!raw || raw.includes(".")) return null;
+  return raw;
+}
+
+
 function getUrl(path: string) {
   return `${API_BASE_URL}/${path.replace(/^\//, "")}`;
 }
@@ -24,6 +36,7 @@ async function request(path: string, options: RequestInit = {}) {
   const response = await fetch(getUrl(path), {
     ...options,
     headers,
+    cache: "no-store",
   });
 
   const data = await response.json().catch(() => ({}));
@@ -140,9 +153,10 @@ export async function createListing(
 export async function uploadImages(listingId: string, files: File[]): Promise<any> {
   const formData = new FormData();
   files.forEach((file) => {
-    formData.append("image", file);
+    formData.append("images", file);
   });
   formData.append("listingID", listingId);
+  formData.append("listingId", listingId);
 
   // Do NOT set Content-Type manually for FormData – the browser adds the
   // multipart boundary automatically.
@@ -155,15 +169,22 @@ export async function uploadImages(listingId: string, files: File[]): Promise<an
 /**
  * Fetches all listings (paginated).
  */
-export async function getAllListings(
+export async function getAllPublicListings(
   page = 1,
-  limit = 10
+  limit = 1000
 ): Promise<{ listings: ListingResponse[] }> {
-  const response = await request(`/listing/all?page=${page}&limit=${limit}`, {
+  // Direct fetch without Authorization header to retrieve all listings publicly.
+  const response = await fetch(`${API_BASE_URL}/listing/all?page=${page}&limit=${limit}`, {
     method: "GET",
+    cache: "no-store",
   });
+  const data = await response.json();
+  if (!response.ok) {
+    const errorMessage = data.message ?? data.error ?? "API request failed";
+    throw new Error(errorMessage);
+  }
   const rawListings =
-    response.listings ?? response.data?.listings ?? (Array.isArray(response.data) ? response.data : []) ?? (Array.isArray(response) ? response : []);
+    data.listings ?? data.data?.listings ?? (Array.isArray(data) ? data : []);
   return { listings: rawListings };
 }
 
@@ -291,9 +312,10 @@ export async function createOffer(
 export async function uploadOfferImages(offerId: string, files: File[]): Promise<any> {
   const formData = new FormData();
   files.forEach((file) => {
-    formData.append("image", file);
+    formData.append("images", file);
   });
   formData.append("offerID", offerId);
+  formData.append("offerId", offerId);
   return request("/offer/upload-images", { method: "POST", body: formData });
 }
 

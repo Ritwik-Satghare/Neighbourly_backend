@@ -2,127 +2,128 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { ListingCard } from "@/components/listing-card";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
 import { categories } from "@/lib/data";
-import { getAllListings, searchListings, type ListingResponse } from "@/lib/api";
+import { getAllPublicListings, searchListings } from "@/lib/api";
 import type { Listing } from "@/lib/data";
+import { getListingImage } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 export default function BrowsePage() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category") || "";
   const initialSearch = searchParams.get("search") || "";
 
+  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
+  const [maxDistance, setMaxDistance] = useState<number | undefined>(undefined);
+  const [locality, setLocality] = useState<string>("");
   const [listings, setListings] = useState<Listing[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
+
+  // Compute displayed listings based on current filters
+  const displayedListings = listings.filter((listing) => {
+    const matchesCategory = selectedCategory
+      ? listing.category?.toLowerCase() === selectedCategory.toLowerCase()
+      : true;
+    const matchesSearch = searchTerm
+      ? listing.title?.toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+    // New distance filter – parse 'Xkm away' string
+    const distanceKm = listing.distance ? Number(listing.distance.replace(/[^0-9.]/g, "")) : Infinity;
+    const matchesDistance = maxDistance ? distanceKm <= maxDistance : true;
+    // New locality filter – use host field as a simple locality indicator
+    const matchesLocality = locality ? (listing.host?.toLowerCase().includes(locality.toLowerCase())) : true;
+    return matchesCategory && matchesSearch && matchesDistance && matchesLocality;
+  });
 
   useEffect(() => {
     async function fetchListings() {
       setIsLoading(true);
+      setError("");
       try {
-        const response = (selectedCategory || initialSearch)
-          ? await searchListings({
-              category: selectedCategory || undefined,
-              search: initialSearch || undefined,
-            })
-          : await getAllListings(1, 100);
+        const response =
+          selectedCategory || searchTerm
+            ? await searchListings({
+                category: selectedCategory || undefined,
+                search: searchTerm || undefined,
+              })
+            : await getAllPublicListings(1, 1000);
 
-        // Debug: raw API response and counts
-        console.log("Listings API response:", response);
         const listingsArray = response.listings ?? [];
-        console.log("Total listings received:", listingsArray.length);
-
         const mappedListings: Listing[] = listingsArray.map((item: any) => {
-          const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
-          const imageSrc =
-            item.image ??
-            item.imageUrl ??
-            item.images?.find((img: any) => img?.isPrimary)?.imageUrl ??
-            item.images?.[0]?.imageUrl ??
-            item.imageURLs?.[0] ??
-            FALLBACK_IMAGE;
-
-          // Temporary debug logging to trace where images come from
-          try {
-            console.log("Listing image mapping:", {
-              listingName: item.name ?? item.title,
-              image: item.image,
-              imageUrl: item.imageUrl,
-              images: item.images,
-              resolvedImage: imageSrc,
-            });
-          } catch (e) {}
-
-          try { console.log("Listing:", item._id, item.name, item.ownerID); } catch (e) {}
+          // Normalise ID or fallback if the backend forgot to send it.
+          const rawId =
+            item.id ??
+            item._id?.$oid ??
+            (typeof item._id === "string" ? item._id : null) ??
+            (item._id ? String(item._id) : null) ??
+            Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 
           return {
-            id: item.id ?? item._id ?? String(Math.random()),
+            id: rawId,
             title: item.title ?? item.name ?? "",
             category: item.category ?? "Tools",
-            distance: item.distance ?? "0.8km away",
+            distance: item.distance ?? "",
             pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
             rating: item.rating ?? 4.9,
-            trustScore: item.trustScore ?? item.trust_score ?? 98,
-            image: imageSrc,
+            trustScore: item.trustScore ?? item.trust_score ?? null,
+            image: getListingImage(item),
             summary: item.summary ?? item.description ?? "",
             host: item.host ?? "Neighbor",
             badge: item.badge,
-          } as Listing;
+            ownerId: item.userId ?? item.ownerId ?? item.owner ?? null,
+          };
         });
 
         setListings(mappedListings);
-        console.log("Mapped listings:", mappedListings);
       } catch (err: any) {
-        // If the API request fails (e.g., auth token missing or invalid), surface the error with structured details.
-        console.error("Failed to fetch listings from API:", {
-          error: err,
-          message: err?.message,
-          response: err?.response,
-        });
-        // Show the error to the user instead of silent fallback.
-        const errMsg = err?.message ?? "Failed to load listings.";
-        setError(errMsg);
-        // Optionally you could still show static demo data, uncomment the lines below if desired:
-        // const { listings: staticListings } = await import("@/lib/data");
-        // setListings(staticListings);
-        // (keep error visible)
+        console.error("Failed to fetch listings:", err);
+        setError(err?.message ?? "Failed to load listings.");
+        // Clear listings on error to avoid stale data
+        setListings([]);
       } finally {
         setIsLoading(false);
       }
     }
-
     fetchListings();
-  }, [selectedCategory, initialSearch]);
+  }, [selectedCategory, searchTerm]);
 
   const handleCategoryClick = (categoryName: string) => {
-    setSelectedCategory((current) => (current === categoryName ? "" : categoryName));
+    setSelectedCategory((current) =>
+      current === categoryName ? "" : categoryName
+    );
   };
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-10">
       <main className="w-full py-4">
         <div className="grid gap-8">
-          
           {/* Header */}
           <PageHeader
             eyebrow="Browse"
             title="Neighborhood rentals"
-            description="Showing curated results near Greenpoint with consistent cards, actions, and item routing."
-            actions={
-              listings.length > 0 ? (
-                <Button href={`/item/${listings[0].id}`}>Open featured item</Button>
-              ) : undefined
-            }
+            description="Click any item to view its full details and request to rent."
           />
 
-          {/* Horizontal Filters */}
+          {/* Search */}
+          <div className="mb-4">
+            <Input
+              label="Search listings"
+              placeholder="Search listings..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full max-w-md"
+            />
+          </div>
+
+          {/* Category filters */}
           <div className="rounded-3xl bg-surface-low p-5 shadow-ambient">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              
-              {/* Categories */}
               <div className="flex flex-wrap gap-3">
                 {categories.map((category) => {
                   const isSelected = selectedCategory.toLowerCase() === category.name.toLowerCase();
@@ -139,18 +140,35 @@ export default function BrowsePage() {
                   );
                 })}
               </div>
-
-              {/* Trust Score */}
-              <div className="rounded-2xl bg-primary-fixed px-5 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                  Trust Score
-                </p>
-                <p className="text-lg font-bold text-primary">90%+</p>
+              <div className="flex items-center gap-4">
+                {/* Max distance filter */}
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Max km"
+                  value={maxDistance ?? ""}
+                  onChange={(e) => setMaxDistance(e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-24 rounded border p-1 text-sm"
+                />
+                {/* Locality filter */}
+                <input
+                  type="text"
+                  placeholder="Locality"
+                  value={locality ?? ""}
+                  onChange={(e) => setLocality(e.target.value)}
+                  className="rounded border p-1 text-sm"
+                />
+                <div className="rounded-2xl bg-primary-fixed px-5 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                    Trust Score
+                  </p>
+                  <p className="text-lg font-bold text-primary">90%+</p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Listings Grid */}
+          {/* Grid */}
           {isLoading ? (
             <div className="flex min-h-60 items-center justify-center rounded-[2rem] bg-surface-low p-8 text-center text-ink-soft">
               <span className="font-semibold">Loading neighborhood listings...</span>
@@ -159,14 +177,20 @@ export default function BrowsePage() {
             <div className="flex min-h-60 items-center justify-center rounded-[2rem] bg-tertiary-fixed p-8 text-center text-tertiary">
               <span className="font-semibold">{error}</span>
             </div>
-          ) : listings.length === 0 ? (
+          ) : displayedListings.length === 0 ? (
             <div className="flex min-h-60 items-center justify-center rounded-[2rem] bg-surface-low p-8 text-center text-ink-soft">
-              <span className="font-semibold">No listings found in this category. Be the first to list!</span>
+              <span className="font-semibold">
+                No listings found. Be the first to list!
+              </span>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {listings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+              {displayedListings.map((listing) => (
+                <ListingCard 
+                  key={listing.id} 
+                  listing={listing} 
+                  onClick={() => router.push(`/item/${listing.id}`)}
+                />
               ))}
             </div>
           )}

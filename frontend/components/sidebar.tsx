@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { dashboardLinks } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { clearAuthSession } from "@/lib/auth";
 
 type SidebarProps = {
   isOpen?: boolean;
@@ -13,6 +16,13 @@ type SidebarProps = {
 
 export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleSignOut = () => {
+    clearAuthSession();
+    router.push("/login");
+  };
+
 
   const navContent = (
     <>
@@ -51,6 +61,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         >
           Create listing
         </Link>
+        <Button onClick={handleSignOut} variant="secondary" className="mt-4 w-full">
+          Sign Out
+        </Button>
       </div>
     </>
   );

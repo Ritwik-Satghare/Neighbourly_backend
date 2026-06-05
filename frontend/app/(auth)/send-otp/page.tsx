@@ -56,7 +56,7 @@ export default function SendOtpPage() {
       setSuccess("OTP sent successfully.");
 
       setTimeout(() => {
-        router.push(`/verify?userId=${userId}`);
+        router.push(`/verify-otp?userId=${userId}`);
       }, 1000);
     } catch (err) {
       setError(
