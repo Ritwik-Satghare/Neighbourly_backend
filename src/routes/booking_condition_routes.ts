@@ -1,13 +1,17 @@
 import { Router } from 'express';
-import * as bookingConditionController from '../controllers/booking_condition_controller'; // Point to the updated controller file
+import * as bookingConditionController from '../controllers/booking_condition_controller'; 
 import { authenticateJWT } from '../middlewares/auth_middleware';
 import multer from 'multer';
 
 const router = Router();
-const upload = multer({ dest: 'uploads/' });
+
+// FIX: Swapped from local disk storage to memory storage to prevent permission errors on Render
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 // POST /api/bookings/:bookingId/condition
-// Targets 'uploadConditionImage' (singular) and catches the 'images' field name from Postman
 router.post(
   '/:bookingId/condition', 
   authenticateJWT, 
@@ -16,7 +20,6 @@ router.post(
 );
 
 // GET /api/bookings/:bookingId/condition
-// Targets 'getConditionImages' from the updated controller
 router.get(
   '/:bookingId/condition', 
   authenticateJWT, 
