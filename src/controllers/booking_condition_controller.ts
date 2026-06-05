@@ -24,7 +24,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const { bookingId } = req.params;
+    const bookingId = req.params.bookingId || req.body.bookingId || req.body.bookingID;
     const { stage } = req.body as { stage?: 'before' | 'after' };
 
     if (!bookingId) {
@@ -114,7 +114,7 @@ export const getConditionImages = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
-    const { bookingId } = req.params;
+    const bookingId = req.params.bookingId || req.body.bookingId || req.body.bookingID;
     if (!bookingId) {
       res.status(400).json({ success: false, message: 'bookingId parameter is required' });
       return;
