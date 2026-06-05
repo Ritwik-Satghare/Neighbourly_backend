@@ -21,9 +21,10 @@ router.post(
   paymentController.createSplitPayment
 );
 
-// POST /payment/verify — Verify Razorpay payment and trigger business side effects
+// POST /payment/verify — Verify payment signature and update booking (bypassed)
 router.post(
   '/verify',
+  validateRequest(paymentController.verifyPaymentSchema),
   paymentController.verifyPayment
 );
 

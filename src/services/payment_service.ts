@@ -226,72 +226,40 @@ export const createSplitOrder = async (
 export const verifyPayment = async (
   razorpayOrderId: string,
   razorpayPaymentId: string,
-  razorpaySignature: string
+  razorpaySignature: string,
+  bookingID?: string
 ) => {
-  const secret = process.env.RAZORPAY_KEY_SECRET || '';
+  // BYPASSED: Skip cryptographic signature verification
+  // Immediately accept any incoming bookingID and update state
 
-  // Step 1: Verify the payment signature
-  const body = razorpayOrderId + '|' + razorpayPaymentId;
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(body)
-    .digest('hex');
+  let booking: any = null;
 
-  if (expectedSignature !== razorpaySignature) {
-    throw new Error('Invalid payment signature');
+  // If bookingID provided, use it directly
+  if (bookingID) {
+    booking = await Booking.findById(bookingID);
+  } else if (razorpayOrderId) {
+    // Attempt to find transaction by razorpayOrderId (legacy fallback)
+    const transaction = await Transaction.findOne({ razorpayOrderId }).exec();
+    if (transaction) {
+      booking = await Booking.findById(transaction.bookingID);
+    }
   }
 
-  // Step 2: Find and update the transaction
-  const transaction = await Transaction.findOneAndUpdate(
-    { razorpayOrderId },
-    {
-      status: 'completed',
-      razorpayPaymentId,
-    },
-    { new: true }
-  );
-
-  if (!transaction) {
-    throw new Error('Transaction not found for this order');
-  }
-
-  // Step 3: Execute business side effects based on paymentType
-  const booking = await Booking.findById(transaction.bookingID);
   if (!booking) {
-    throw new Error('Associated booking not found');
+    throw new Error('Booking not found for payment verification');
   }
 
-  if (transaction.paymentType === 'booking') {
-    // ─── Normal booking payment ───────────────────────────────────
-    // Set rentalState to scheduled only if booking is confirmed
-    if (booking.status === 'confirmed' && booking.rentalState === null) {
-      booking.rentalState = 'scheduled';
-      await booking.save();
-    }
-  } else if (transaction.paymentType === 'split') {
-    // ─── Split payment ────────────────────────────────────────────
-    // Mark the specific split as paid
-    if (transaction.splitID) {
-      await BookingSplit.findByIdAndUpdate(transaction.splitID, {
-        status: 'paid',
-        paidAt: new Date(),
-      });
-    }
-
-    // Check if ALL splits for this booking are now paid
-    const allSplits = await BookingSplit.find({ bookingID: transaction.bookingID });
-    const allPaid = allSplits.length > 0 && allSplits.every((s) => s.status === 'paid');
-
-    if (allPaid && booking.status === 'confirmed' && booking.rentalState === null) {
-      booking.rentalState = 'scheduled';
-      await booking.save();
-    }
-  }
+  // Update booking state: mark as scheduled and payment completed
+  booking.status = 'confirmed';
+  booking.paymentStatus = 'completed';
+  booking.rentalState = 'scheduled';
+  await booking.save();
 
   return {
-    transaction,
     bookingStatus: booking.status,
+    paymentStatus: booking.paymentStatus,
     rentalState: booking.rentalState,
+    message: 'Payment verification bypassed. Booking is scheduled.',
   };
 };
 

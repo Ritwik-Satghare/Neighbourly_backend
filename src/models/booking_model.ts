@@ -8,6 +8,7 @@ export interface IBooking extends Document {
   endDate: Date;
   totalPrice: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  paymentStatus: 'pending' | 'completed';
   rentalState: 'scheduled' | 'checked_out' | 'returned' | null;
   actualStartDate: Date | null;
   actualReturnDate: Date | null;
@@ -51,6 +52,11 @@ const bookingSchema: Schema = new Schema(
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+      default: 'pending',
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'completed'],
       default: 'pending',
     },
     // ─── Rental Lifecycle ──────────────────────────────────────────────
