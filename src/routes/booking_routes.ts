@@ -3,26 +3,25 @@ import * as bookingController from '../controllers/booking_controller';
 import * as bookingConditionController from '../controllers/booking_condition_controller';
 import { authenticateJWT } from '../middlewares/auth_middleware';
 import { validateRequest } from '../middlewares/validation_middleware';
+import multer from 'multer';
 
 const router = Router();
+
+// Configure type-safe memory stream upload for handling binary arrays
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 // All booking routes require authentication
 router.use(authenticateJWT);
 
 // ─── Booking CRUD ────────────────────────────────────────────────────────────
 
-// GET /booking/user — Get all bookings for the authenticated user
-// Query params: role (renter|owner), status (pending|confirmed|cancelled|completed)
 router.get('/user', bookingController.getUserBookings);
-
-// GET /booking/:id — Get a single booking by ID
 router.get('/:id', bookingController.getBookingById);
-
-// PATCH /booking/cancel/:id — Cancel a booking (renter only)
 router.patch('/cancel/:id', bookingController.cancelBooking);
 
-// PATCH /booking/status/:id — Update booking status (owner only)
-// Body: { status: 'confirmed' | 'completed' }
 router.patch(
   '/status/:id',
   validateRequest(bookingController.updateStatusSchema),
@@ -31,22 +30,20 @@ router.patch(
 
 // ─── Rental Lifecycle ──────────────────────────────────────────────────────
 
-// PATCH /booking/start/:id — Mark item as handed over (owner only)
 router.patch('/start/:id', bookingController.startRental);
-
-// PATCH /booking/return/:id — Mark item as returned (owner only)
 router.patch('/return/:id', bookingController.returnRental);
 
-// ─── Booking Condition Images ────────────────────────────────────────────────
+// ─── Booking Condition Images (Phase-1 Unified) ──────────────────────────────
 
-// POST /booking/upload-condition — Upload a before/after condition image
+// POST /booking/upload-condition
+// Swapped out validateRequest for Multer parsing to handle binary images seamlessly!
 router.post(
   '/upload-condition',
-  validateRequest(bookingConditionController.uploadConditionSchema),
+  upload.array('images', 5), 
   bookingConditionController.uploadConditionImage
 );
 
-// GET /booking/condition/:bookingID — Get all condition images for a booking
-router.get('/condition/:bookingID', bookingConditionController.getConditionImages);
+// GET /booking/condition/:bookingId
+router.get('/condition/:bookingId', bookingConditionController.getConditionImages);
 
 export default router;

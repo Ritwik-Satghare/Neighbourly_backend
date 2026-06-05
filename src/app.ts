@@ -65,6 +65,7 @@ import messageRoutes from './routes/message_routes';
 import reviewRoutes from './routes/review_routes';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import bookingConditionRoutes from './routes/booking_condition_routes';
 
 const app = express();
 
@@ -84,6 +85,7 @@ app.use('/payment', paymentRoutes);
 app.use('/conversation', conversationRoutes);
 app.use('/message', messageRoutes);
 app.use('/review', reviewRoutes);
+app.use('/booking_condition', bookingConditionRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {

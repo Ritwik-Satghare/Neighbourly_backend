@@ -118,6 +118,7 @@ export const acceptOffer = async (offerID: string, ownerID: string) => {
   await offer.save();
 
   // Create Booking automatically when offer is accepted
+  // Bypass payment requirement: set to confirmed + completed status immediately
   const booking = await Booking.create({
     offerID: offer._id,
     renterID: offer.senderID,
@@ -125,7 +126,9 @@ export const acceptOffer = async (offerID: string, ownerID: string) => {
     startDate: offer.startDate,
     endDate: offer.endDate,
     totalPrice: offer.amount,
-    status: 'pending',
+    status: 'confirmed',
+    paymentStatus: 'completed',
+    rentalState: 'scheduled',
   });
 
   return { offer, booking };
