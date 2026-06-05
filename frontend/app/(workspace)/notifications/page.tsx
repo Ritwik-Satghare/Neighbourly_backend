@@ -11,14 +11,26 @@ export default function NotificationsPage() {
   const [renterNotifications, setRenterNotifications] = useState<MockBooking[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const markAllAsRead = (pending: MockBooking[], renter: MockBooking[]) => {
+    const currentKeys = [
+      ...pending.map(r => `${r._id}_${r.status}`),
+      ...renter.map(r => `${r._id}_${r.status}`)
+    ];
+    localStorage.setItem("neighbourly.readNotifications", JSON.stringify(currentKeys));
+    window.dispatchEvent(new Event("neighbourly-notifications-read"));
+  };
+
   useEffect(() => {
     const fetchRequests = async () => {
       try {
         const ownerBookings = await getBookings("owner");
-        setPendingRequests(ownerBookings.filter((b: MockBooking) => b.status === "pending"));
+        const pending = ownerBookings.filter((b: MockBooking) => b.status === "pending");
+        setPendingRequests(pending);
 
         const renterBookings = await getBookings("renter");
         setRenterNotifications(renterBookings);
+
+        markAllAsRead(pending, renterBookings);
       } catch (err) {
         console.error("Failed to load requests", err);
       } finally {
@@ -31,7 +43,11 @@ export default function NotificationsPage() {
   const handleAccept = async (id: string) => {
     try {
       await confirmOrCompleteBooking(id, "active");
-      setPendingRequests((prev) => prev.filter((b) => b._id !== id));
+      setPendingRequests((prev) => {
+        const updated = prev.filter((b) => b._id !== id);
+        markAllAsRead(updated, renterNotifications);
+        return updated;
+      });
     } catch (err) {
       console.error(err);
       alert("Failed to accept booking.");
@@ -41,7 +57,11 @@ export default function NotificationsPage() {
   const handleDecline = async (id: string) => {
     try {
       await cancelBooking(id);
-      setPendingRequests((prev) => prev.filter((b) => b._id !== id));
+      setPendingRequests((prev) => {
+        const updated = prev.filter((b) => b._id !== id);
+        markAllAsRead(updated, renterNotifications);
+        return updated;
+      });
     } catch (err) {
       console.error(err);
       alert("Failed to decline booking.");

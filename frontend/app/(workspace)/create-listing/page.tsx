@@ -79,7 +79,7 @@ export default function CreateListingPage() {
       <PageHeader
         eyebrow="Host"
         title="Create a new listing"
-        description="A clean reusable form replaces the original static HTML and routes hosts back into the dashboard flow."
+        description="List your item on Neighbourly to share it with your local community. Set your price, pickup location, and availability slots below."
       />
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         <form onSubmit={handleSubmit} className="grid gap-6 rounded-[2rem] bg-surface-card p-8 shadow-ambient">
