@@ -8,14 +8,17 @@ import { getBookings, confirmOrCompleteBooking, cancelBooking, MockBooking } fro
 
 export default function NotificationsPage() {
   const [pendingRequests, setPendingRequests] = useState<MockBooking[]>([]);
+  const [renterNotifications, setRenterNotifications] = useState<MockBooking[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const bookings = await getBookings("owner");
-        // Only show pending requests as actionable notifications
-        setPendingRequests(bookings.filter((b: MockBooking) => b.status === "pending"));
+        const ownerBookings = await getBookings("owner");
+        setPendingRequests(ownerBookings.filter((b: MockBooking) => b.status === "pending"));
+
+        const renterBookings = await getBookings("renter");
+        setRenterNotifications(renterBookings);
       } catch (err) {
         console.error("Failed to load requests", err);
       } finally {
@@ -87,6 +90,51 @@ export default function NotificationsPage() {
               </article>
             ))}
 
+            {renterNotifications.map((req) => {
+              let badgeText = "Request Sent";
+              let badgeColor = "bg-surface-low text-ink-soft";
+              let titleText = `You requested to rent ${req.itemTitle}`;
+              let bodyText = `Status: Awaiting owner approval • Price: $${req.pricePerDay} / day`;
+
+              if (req.status === "active") {
+                badgeText = "Booking Confirmed";
+                badgeColor = "bg-emerald-100 text-emerald-800";
+                titleText = `Your booking for ${req.itemTitle} has been accepted!`;
+                bodyText = `The owner accepted your request. Ready for pickup! • Price: $${req.pricePerDay} / day`;
+              } else if (req.status === "completed") {
+                badgeText = "Completed";
+                badgeColor = "bg-primary-fixed text-primary";
+                titleText = `Rental completed for ${req.itemTitle}`;
+                bodyText = `Thank you for renting! Hope you had a great experience.`;
+              } else if (req.status === "canceled") {
+                badgeText = "Declined";
+                badgeColor = "bg-rose-100 text-rose-800";
+                titleText = `Request for ${req.itemTitle} was declined`;
+                bodyText = `The owner declined the rental request.`;
+              }
+
+              return (
+                <article key={req._id} className="rounded-[1.75rem] bg-surface-card p-6 shadow-ambient">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${badgeColor}`}>
+                        {badgeText}
+                      </span>
+                      <h2 className="mt-4 font-headline text-2xl font-bold text-ink-strong">
+                        {titleText}
+                      </h2>
+                      <p className="mt-2 text-sm text-ink-soft">
+                        {bodyText}
+                      </p>
+                    </div>
+                    <div className="text-sm font-medium text-ink-soft">
+                      {new Date(req.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+
             {/* Static mock notifications for visual filler if desired */}
             {mockNotifications.map((notification) => (
               <article key={notification.title} className="rounded-[1.75rem] bg-surface-card p-6 shadow-ambient opacity-70">
@@ -101,7 +149,7 @@ export default function NotificationsPage() {
               </article>
             ))}
 
-            {pendingRequests.length === 0 && mockNotifications.length === 0 && (
+            {pendingRequests.length === 0 && renterNotifications.length === 0 && mockNotifications.length === 0 && (
               <div className="text-ink-soft">No new notifications.</div>
             )}
           </>

@@ -76,7 +76,7 @@ export default function DashboardPage() {
       setBookingsLoading(true);
 
       try {
-        const data = await getBookings();
+        const data = await getBookings("renter");
         // getBookings returns MockBooking[] directly
         setBookings(Array.isArray(data) ? data : []);
       } catch (err) {
