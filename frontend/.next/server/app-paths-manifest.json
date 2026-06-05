@@ -1,0 +1,9 @@
+{
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(workspace)/messages/page": "app/(workspace)/messages/page.js",
+  "/(workspace)/browse/page": "app/(workspace)/browse/page.js",
+  "/(workspace)/notifications/page": "app/(workspace)/notifications/page.js",
+  "/(marketing)/page": "app/(marketing)/page.js",
+  "/(workspace)/item/[id]/page": "app/(workspace)/item/[id]/page.js",
+  "/(workspace)/home/page": "app/(workspace)/home/page.js"
+}

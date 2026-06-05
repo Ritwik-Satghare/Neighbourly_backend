@@ -15,7 +15,15 @@ export const sendMessage = async (conversationID: string, senderID: string, cont
     sentTime: new Date(),
   });
 
-  return message;
+  // Populate senderID so socket broadcasts include {_id, fullName}
+  const populated = await Message.findById(message._id)
+    .populate('senderID', 'fullName avatarUrl')
+    .lean();
+
+  // Bump conversation's updatedAt so it sorts to the top
+  await conversationService.touchConversation(conversationID);
+
+  return populated;
 };
 
 export const getMessages = async (conversationID: string, userID: string, page: number = 1, limit: number = 50) => {

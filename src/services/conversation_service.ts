@@ -11,7 +11,9 @@ export const createConversation = async (user1ID: string, user2ID: string) => {
       { participant1ID: user1ID, participant2ID: user2ID },
       { participant1ID: user2ID, participant2ID: user1ID },
     ],
-  });
+  })
+    .populate('participant1ID', 'fullName avatarUrl')
+    .populate('participant2ID', 'fullName avatarUrl');
 
   if (existing) {
     return existing;
@@ -22,7 +24,17 @@ export const createConversation = async (user1ID: string, user2ID: string) => {
     participant2ID: user2ID,
   });
 
-  return conversation;
+  // Populate before returning so the frontend gets {_id, fullName} objects
+  const populated = await Conversation.findById(conversation._id)
+    .populate('participant1ID', 'fullName avatarUrl')
+    .populate('participant2ID', 'fullName avatarUrl');
+
+  return populated;
+};
+
+/** Bump conversation updatedAt when a message is sent */
+export const touchConversation = async (conversationID: string) => {
+  await Conversation.findByIdAndUpdate(conversationID, { updatedAt: new Date() });
 };
 
 export const getConversations = async (userID: string) => {

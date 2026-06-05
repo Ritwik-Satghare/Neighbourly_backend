@@ -1,0 +1,493 @@
+"use client";
+
+import { FormEvent, use, useEffect, useState } from "react";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { getListingById as apiGetListingById, normaliseId } from "@/lib/api";
+import { formatCurrency, getListingImage } from "@/lib/utils";
+import { getValidAuthToken, getCurrentUserId } from "@/lib/auth";
+import { listings as mockListings } from "@/lib/data";
+import type { Listing } from "@/lib/data";
+import { createReview, getReviewsByListing, type Review } from "@/services/review";
+import { createBookingMock } from "@/services/booking";
+
+type ItemPageProps = {
+  params: Promise<{ id: string }>;
+};
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+
+export default function ItemPage({ params }: ItemPageProps) {
+  const { id } = use(params);
+  const [item, setItem] = useState<Listing | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [bookingStatus, setBookingStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [bookingMessage, setBookingMessage] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+
+  const [availabilitySlots, setAvailabilitySlots] = useState<any[]>([]);
+  const [pickupDate, setPickupDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState("");
+
+  const renderStars = (value: number) => {
+    const filled = Math.max(0, Math.min(5, Math.round(value)));
+    return Array.from({ length: 5 }, (_, index) => (index < filled ? "★" : "☆")).join("");
+  };
+
+  const getReviewDate = (review: Review) => {
+    const raw = review.createdAt ?? review.created_at;
+    if (!raw) return null;
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const loadReviews = async (listingId: string) => {
+    setReviewsError("");
+    setReviewsLoading(true);
+
+    try {
+      const response = await getReviewsByListing(listingId);
+      const payload = response.reviews ?? response.data ?? response;
+      setReviews(Array.isArray(payload) ? payload : []);
+    } catch (err: unknown) {
+      setReviewsError((err as Error)?.message ?? "Unable to load reviews.");
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const handleSubmitReview = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitError("");
+    setSubmitSuccess("");
+
+    if (rating <= 0) {
+      setSubmitError("Please select a rating.");
+      return;
+    }
+
+    if (!comment.trim()) {
+      setSubmitError("Please enter a comment.");
+      return;
+    }
+
+    if (!item?.id) {
+      setSubmitError("Unable to submit review without a valid listing.");
+      return;
+    }
+
+    setSubmitLoading(true);
+
+    try {
+      await createReview(item.id, rating, comment.trim());
+      setSubmitSuccess("Review submitted successfully.");
+      setRating(0);
+      setComment("");
+      await loadReviews(item.id);
+    } catch (err: unknown) {
+      setSubmitError((err as Error)?.message ?? "Failed to submit review.");
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    async function loadItem() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await apiGetListingById(id);
+        const rawId = normaliseId(data) ?? id;
+
+        let summaryText = data.summary ?? data.description ?? "";
+        let parsedSlots: any[] = [];
+        const marker = "\n\n[AvailabilitySlots]:";
+        if (summaryText.includes(marker)) {
+          const parts = summaryText.split(marker);
+          summaryText = parts[0];
+          try {
+            parsedSlots = JSON.parse(parts[1]);
+          } catch (e) {
+            console.error("Error parsing availability slots:", e);
+          }
+        }
+        setAvailabilitySlots(parsedSlots);
+
+        const mapped: Listing = {
+          id: rawId,
+          title: data.title ?? (data as any).name ?? "",
+          category: data.category ?? "Tools",
+          distance: data.distance ?? "0.8km away",
+          pricePerDay: Number(data.pricePerDay ?? data.price_per_day ?? 0),
+          rating: data.rating ?? 4.9,
+          trustScore: data.trustScore ?? data.trust_score ?? 98,
+          image: getListingImage(data),
+          summary: summaryText,
+          host: data.host ?? "Neighbor",
+        };
+        setItem(mapped);
+
+        // Check ownership
+        const currentUserId = getCurrentUserId();
+        const rawOwnerId =
+          (data as any).ownerID ??
+          (data as any).ownerId ??
+          (data as any).userId ??
+          (data as any).owner ??
+          null;
+        setOwnerId(rawOwnerId ? String(rawOwnerId) : null);
+        if (currentUserId && rawOwnerId) {
+          setIsOwner(String(currentUserId) === String(rawOwnerId));
+        }
+
+        // Load reviews for this listing
+        await loadReviews(rawId);
+      } catch (err: any) {
+        setError(err.message ?? "Failed to load item details.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadItem();
+  }, [id]);
+
+  async function handleRequestToRent() {
+    const token = getValidAuthToken();
+    if (!token) {
+      setBookingStatus("error");
+      setBookingMessage("You must be logged in to send a request.");
+      return;
+    }
+
+    if (!pickupDate || !returnDate) {
+      setBookingStatus("error");
+      setBookingMessage("Please select both Pickup and Return dates.");
+      return;
+    }
+
+    // Check that returnDate is after pickupDate
+    if (new Date(returnDate) < new Date(pickupDate)) {
+      setBookingStatus("error");
+      setBookingMessage("Return date must be on or after the pickup date.");
+      return;
+    }
+
+    setBookingStatus("loading");
+    setBookingMessage("");
+
+    try {
+      if (!item) {
+        throw new Error("No item details found.");
+      }
+
+      await createBookingMock(
+        item.id,
+        item.title,
+        item.image,
+        ownerId ?? "",
+        item.pricePerDay,
+        pickupDate,
+        returnDate
+      );
+
+      setBookingStatus("success");
+      setBookingMessage("Booking request sent! The owner will review it shortly.");
+    } catch (err: any) {
+      setBookingStatus("error");
+      setBookingMessage(err.message ?? "Something went wrong. Please try again.");
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center rounded-[2rem] bg-surface-card p-8 shadow-ambient text-center text-ink-soft">
+        <span className="font-semibold">Loading item details...</span>
+      </div>
+    );
+  }
+
+  if (error || !item) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-[2rem] bg-surface-card p-8 shadow-ambient text-center">
+        <p className="font-semibold text-tertiary">{error || "Item not found"}</p>
+        <Button href="/browse" variant="secondary">
+          Back to Browse
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+      {/* Left: Images + Details */}
+      <section className="grid gap-8">
+        <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+          <div className="relative min-h-[420px] overflow-hidden rounded-[2rem]">
+            <Image
+              alt={item.title}
+              className="object-cover"
+              fill
+              sizes="(max-width: 1024px) 100vw, 60vw"
+              src={item.image}
+            />
+          </div>
+          <div className="grid gap-4">
+            {mockListings.slice(1, 3).map((listing) => (
+              <div
+                key={listing.id}
+                className="relative min-h-[200px] overflow-hidden rounded-[1.5rem]"
+              >
+                <Image
+                  alt={listing.title}
+                  className="object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 25vw"
+                  src={listing.image}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] bg-surface-card p-8 shadow-ambient">
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+                {item.category}
+              </p>
+              <h1 className="mt-3 font-headline text-4xl font-extrabold text-ink-strong">
+                {item.title}
+              </h1>
+              <p className="mt-3 max-w-2xl text-base text-ink-soft">
+                {item.summary}
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] bg-secondary-container px-5 py-4 text-secondary">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
+                Trust score
+              </p>
+              <p className="font-headline text-4xl font-extrabold">
+                {item.trustScore}%
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {[
+              ["Host", item.host],
+              ["Distance", item.distance],
+              ["Category", item.category],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-[1.5rem] bg-surface-low p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
+                  {label}
+                </p>
+                <p className="mt-2 font-semibold text-ink-strong">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Availability slots details */}
+          <div className="mt-8 border-t border-outline/20 pt-6">
+            <h3 className="text-lg font-bold text-ink-strong">Lender's Available Slots</h3>
+            <p className="text-xs text-ink-soft mt-1 mb-4">The lender has marked these slots/dates as free for rental handoff:</p>
+            {availabilitySlots && availabilitySlots.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {availabilitySlots.map((slot: any) => (
+                  <div key={slot.id || Math.random()} className="rounded-2xl bg-primary-fixed/20 border border-primary/10 px-4 py-2 text-sm text-primary font-medium">
+                    {slot.type === "weekly" ? (
+                      <span>Weekly: {slot.startDay} – {slot.endDay}</span>
+                    ) : (
+                      <span>Dates: {slot.startDate} to {slot.endDate}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-muted italic">No specific availability slots declared. Please coordinate pickup directly.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-6">
+          <div className="rounded-[2rem] bg-surface-card p-8 shadow-ambient">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-ink-strong">Reviews</h2>
+                <p className="text-sm text-ink-soft">Feedback from people who rented this item.</p>
+              </div>
+            </div>
+
+            {reviewsLoading ? (
+              <div className="mt-6 rounded-[1.5rem] bg-surface-low p-6 text-sm text-ink-soft">
+                Loading reviews…
+              </div>
+            ) : reviewsError ? (
+              <div className="mt-6 rounded-[1.5rem] bg-rose-50 p-6 text-sm text-rose-900">
+                {reviewsError}
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="mt-6 rounded-[1.5rem] bg-surface-low p-6 text-sm text-ink-soft">
+                No reviews yet.
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-4">
+                {reviews.map((review) => (
+                  <div key={review._id ?? review.id ?? `${review.listingID ?? review.listingId}-${review.userID ?? review.userId}-${review.comment}`}
+                    className="rounded-[1.5rem] border border-slate-200 bg-white p-6">
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-base font-semibold text-ink-strong">{renderStars(review.rating)}</p>
+                      {getReviewDate(review) ? (
+                        <p className="text-sm text-ink-soft">{getReviewDate(review)}</p>
+                      ) : null}
+                    </div>
+                    {review.reviewerName || review.name ? (
+                      <p className="mt-3 font-semibold text-ink-strong">{review.reviewerName ?? review.name}</p>
+                    ) : null}
+                    <p className="mt-2 text-sm leading-6 text-ink-soft">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmitReview} className="rounded-[2rem] bg-surface-card p-8 shadow-ambient">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-ink-strong">Leave a review</h2>
+              <p className="mt-2 text-sm text-ink-soft">Share your experience with this listing.</p>
+            </div>
+
+            {submitError ? (
+              <div className="mb-4 rounded-[1.5rem] bg-rose-50 p-4 text-sm text-rose-900">{submitError}</div>
+            ) : null}
+            {submitSuccess ? (
+              <div className="mb-4 rounded-[1.5rem] bg-emerald-50 p-4 text-sm text-emerald-900">{submitSuccess}</div>
+            ) : null}
+
+            <div className="grid gap-4">
+              <label className="grid gap-2 text-sm font-semibold text-ink-strong">
+                Rating
+                <select
+                  className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-3 text-sm text-ink-strong outline-none focus:border-primary"
+                  value={rating}
+                  onChange={(event) => setRating(Number(event.target.value))}
+                >
+                  <option value={0}>Select rating</option>
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <option key={value} value={value}>{value} star{value > 1 ? "s" : ""}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2 text-sm font-semibold text-ink-strong">
+                Comment
+                <textarea
+                  className="min-h-[120px] rounded-[1.5rem] border border-slate-200 bg-white px-4 py-3 text-sm text-ink-strong outline-none focus:border-primary"
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  placeholder="Tell others what you enjoyed about the item"
+                />
+              </label>
+
+              <Button type="submit" className="w-full justify-center" disabled={submitLoading}>
+                {submitLoading ? "Submitting review…" : "Submit review"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      {/* Right: Booking sidebar */}
+      <aside className="h-fit rounded-[2rem] bg-surface-card p-8 shadow-ambient lg:sticky lg:top-28">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-sm text-ink-soft">Starting at</p>
+            <p className="font-headline text-4xl font-extrabold text-primary">
+              {formatCurrency(item.pricePerDay)}
+            </p>
+          </div>
+          <div className="rounded-full bg-primary-fixed px-4 py-2 text-sm font-semibold text-primary">
+            Excellent
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-4">
+          <label className="grid gap-2 rounded-[1.5rem] bg-surface-low p-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft cursor-pointer">
+            <span>Pick up Date</span>
+            <input
+              type="date"
+              value={pickupDate}
+              onChange={(e) => setPickupDate(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-transparent bg-white p-3 text-sm font-semibold text-ink-strong outline-none focus:border-primary/40 normal-case tracking-normal"
+            />
+          </label>
+          <label className="grid gap-2 rounded-[1.5rem] bg-surface-low p-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft cursor-pointer">
+            <span>Return Date</span>
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-transparent bg-white p-3 text-sm font-semibold text-ink-strong outline-none focus:border-primary/40 normal-case tracking-normal"
+            />
+          </label>
+
+          {/* Booking feedback */}
+          {bookingStatus === "success" && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800">
+              {bookingMessage}
+            </div>
+          )}
+          {bookingStatus === "error" && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800">
+              {bookingMessage}
+            </div>
+          )}
+
+          {isOwner ? (
+            <div className="rounded-xl bg-surface-low p-4 text-center text-sm text-ink-soft">
+              You listed this item — you cannot request to rent it.
+            </div>
+          ) : (
+            <Button
+              className="w-full justify-center"
+              onClick={handleRequestToRent}
+              disabled={bookingStatus === "loading" || bookingStatus === "success"}
+            >
+              {bookingStatus === "loading"
+                ? "Sending request..."
+                : bookingStatus === "success"
+                ? "Request sent ✓"
+                : "Request to Rent"}
+            </Button>
+          )}
+
+          <Button
+            className="w-full justify-center"
+            href="/verify"
+            variant="secondary"
+          >
+            Verify condition first
+          </Button>
+        </div>
+      </aside>
+    </div>
+  );
+}
