@@ -3,7 +3,7 @@ import { Eye, Pencil, Trash } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import type { UserListing } from "@/lib/data";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getListingImage } from "@/lib/utils";
 
 type OwnerListingCardProps = {
   listing: UserListing;
@@ -14,34 +14,7 @@ export function OwnerListingCard({ listing, onDelete }: OwnerListingCardProps) {
   return (
     <div className="flex h-full w-full flex-col rounded-[1.5rem] bg-surface-card p-4 shadow-ambient">
       <div className="relative h-48 w-full overflow-hidden rounded-xl">
-        {(() => {
-          const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1504148455328-c376907d081c";
-          const imageSrc =
-            listing.image ||
-            (listing as any).imageUrl ||
-            (listing as any).images?.find((img: any) => img?.isPrimary)?.imageUrl ||
-            (listing as any).images?.[0]?.imageUrl ||
-            (listing as any).imageURLs?.[0] ||
-            FALLBACK_IMAGE;
-
-          try {
-            console.log("Owner listing image mapping:", {
-              listingName: (listing as any).name || listing.title,
-              image: listing.image,
-              imageUrl: (listing as any).imageUrl,
-              images: (listing as any).images,
-              resolvedImage: imageSrc,
-            });
-          } catch (e) {}
-
-          if (!imageSrc || imageSrc === "") {
-            console.error("Missing image source", listing);
-          }
-
-          return (
-            <Image alt={listing.title} className="object-cover" fill sizes="(max-width: 768px) 100vw, 33vw" src={imageSrc} />
-          );
-        })()}
+        <Image alt={listing.title} className="object-cover" fill sizes="(max-width: 768px) 100vw, 33vw" src={getListingImage(listing)} />
       </div>
       <div className="mt-4 flex flex-grow flex-col">
         <div className="flex items-start justify-between gap-3">

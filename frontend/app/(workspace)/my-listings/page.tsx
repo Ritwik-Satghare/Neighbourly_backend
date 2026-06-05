@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { OwnerListingCard } from "@/components/owner-listing-card";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { getUserListings } from "@/lib/api";
+import { getUserListings, normaliseId } from "@/lib/api";
 import { getCurrentUserId, getStoredUser } from "@/lib/auth";
 import type { UserListing } from "@/lib/data";
+import { getListingImage } from "@/lib/utils";
 
 export default function MyListingsPage() {
   const [userListings, setUserListings] = useState<UserListing[]>([]);
@@ -34,22 +35,12 @@ export default function MyListingsPage() {
         const listingsData = response.listings ?? [];
         console.log("My listings response count:", listingsData.length);
         const mapped = listingsData.map((item: any) => {
-          const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
-          const imageSrc =
-            item.image ??
-            item.imageUrl ??
-            item.images?.find((img: any) => img?.isPrimary)?.imageUrl ??
-            item.images?.[0]?.imageUrl ??
-            item.imageURLs?.[0] ??
-            FALLBACK_IMAGE;
-          try { console.log("My listings image mapping:", { id: item._id ?? item.id, name: item.name ?? item.title, resolved: imageSrc }); } catch (e) {}
-
           return {
-            id: item.id ?? item._id ?? String(Math.random()),
+            id: normaliseId(item) ?? String(Math.random()),
             title: item.title ?? item.name ?? "",
             pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
             status: item.status ?? "Active",
-            image: imageSrc,
+            image: getListingImage(item),
             category: item.category ?? "Tools",
             summary: item.summary ?? item.description ?? "",
             requests: item.requests ?? 0,

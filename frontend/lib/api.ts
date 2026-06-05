@@ -2,6 +2,44 @@ import { getValidAuthToken, getCurrentUserId } from "@/lib/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/api";
 
+export function normaliseId(item: any): string | null {
+  if (!item) return null;
+  
+  const candidates = [
+    item?.id,
+    item?._id,
+    item?.listingId,
+    item?.listingID,
+    item?.data?.id,
+    item?.data?._id,
+    item?.listing?.id,
+    item?.listing?._id
+  ];
+
+  for (const val of candidates) {
+    if (!val) continue;
+    
+    if (typeof val === "string" && !val.includes(".")) {
+      return val;
+    }
+    
+    if (typeof val === "object" && typeof (val as any).$oid === "string") {
+      return (val as any).$oid;
+    }
+    
+    if (typeof val === "object") {
+      const str = String(val);
+      if (str && str !== "[object Object]" && !str.includes(".")) {
+        return str;
+      }
+    }
+  }
+
+  console.warn("[normaliseId] failed to normalise ID for item:", item);
+  return null;
+}
+
+
 function getUrl(path: string) {
   return `${API_BASE_URL}/${path.replace(/^\//, "")}`;
 }
@@ -24,6 +62,7 @@ async function request(path: string, options: RequestInit = {}) {
   const response = await fetch(getUrl(path), {
     ...options,
     headers,
+    cache: "no-store",
   });
 
   const data = await response.json().catch(() => ({}));
@@ -55,6 +94,7 @@ export type CreateListingPayload = {
   pricePerDay: number;
   neighborhood?: string;
   conditionNotes?: string;
+  availabilitySlots?: any[];
 };
 
 export type SearchParams = {
@@ -82,6 +122,7 @@ export type ListingResponse = {
   images?: string[];
   host?: string;
   ownerId?: string;
+  ownerID?: string;
   trustScore?: number;
   distance?: string;
   rating?: number;
@@ -89,6 +130,7 @@ export type ListingResponse = {
   price_per_day?: number;
   trust_score?: number;
   description?: string;
+  name?: string;
 };
 
 // ─── Listing helpers ──────────────────────────────────────────────────────────
@@ -106,11 +148,18 @@ export async function createListing(
   const userId = getCurrentUserId();
 
   // Build the payload the backend expects.
+  let finalDescription = payload.summary;
+  if (payload.availabilitySlots && payload.availabilitySlots.length > 0) {
+    finalDescription += `\n\n[AvailabilitySlots]:${JSON.stringify(payload.availabilitySlots)}`;
+  }
+
   const apiPayload: Record<string, unknown> = {
     name: payload.title,
     category: payload.category,
-    description: payload.summary,
+    description: finalDescription,
     pricePerDay: payload.pricePerDay,
+    availability: payload.availabilitySlots || [],
+    availability_slots: payload.availabilitySlots || [],
   };
 
   // Only include optional fields when they have a value.
@@ -128,42 +177,82 @@ export async function createListing(
     body: JSON.stringify(apiPayload),
   });
 
+  const listingData = response.listing ?? response.data ?? response;
   return {
-    listing: response.listing ?? response.data ?? response,
-    id: response.listing?.id ?? response.id ?? response.data?.id,
+    listing: listingData,
+    id: normaliseId(listingData) ?? "",
   };
 }
 
-/**
- * Uploads images for a listing.
- */
 export async function uploadImages(listingId: string, files: File[]): Promise<any> {
-  const formData = new FormData();
-  files.forEach((file) => {
-    formData.append("image", file);
-  });
-  formData.append("listingID", listingId);
+  try {
+    // Option A: Single request with field name 'images' (plural) and both listingID/listingId
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("images", file);
+    });
+    formData.append("listingID", listingId);
+    formData.append("listingId", listingId);
 
-  // Do NOT set Content-Type manually for FormData – the browser adds the
-  // multipart boundary automatically.
-  return request("/listing/upload-images", {
-    method: "POST",
-    body: formData,
-  });
+    return await request("/listing/upload-images", {
+      method: "POST",
+      body: formData,
+    });
+  } catch (err) {
+    console.warn("Upload with field name 'images' failed, retrying with field 'image'...", err);
+    
+    try {
+      // Option B: Single request with field name 'image' (singular) and both listingID/listingId
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append("image", file);
+      });
+      formData.append("listingID", listingId);
+      formData.append("listingId", listingId);
+
+      return await request("/listing/upload-images", {
+        method: "POST",
+        body: formData,
+      });
+    } catch (err2) {
+      console.warn("Upload with single request field 'image' failed, retrying with individual requests...", err2);
+      
+      // Option C: Individual requests with field name 'image' (singular)
+      const uploadPromises = files.map((file) => {
+        const formData = new FormData();
+        formData.append("image", file);
+        formData.append("listingID", listingId);
+        formData.append("listingId", listingId);
+
+        return request("/listing/upload-images", {
+          method: "POST",
+          body: formData,
+        });
+      });
+      return Promise.all(uploadPromises);
+    }
+  }
 }
 
 /**
  * Fetches all listings (paginated).
  */
-export async function getAllListings(
+export async function getAllPublicListings(
   page = 1,
-  limit = 10
+  limit = 1000
 ): Promise<{ listings: ListingResponse[] }> {
-  const response = await request(`/listing/all?page=${page}&limit=${limit}`, {
+  // Direct fetch without Authorization header to retrieve all listings publicly.
+  const response = await fetch(`${API_BASE_URL}/listing/all?page=${page}&limit=${limit}`, {
     method: "GET",
+    cache: "no-store",
   });
+  const data = await response.json();
+  if (!response.ok) {
+    const errorMessage = data.message ?? data.error ?? "API request failed";
+    throw new Error(errorMessage);
+  }
   const rawListings =
-    response.listings ?? response.data?.listings ?? (Array.isArray(response.data) ? response.data : []) ?? (Array.isArray(response) ? response : []);
+    data.listings ?? data.data?.listings ?? (Array.isArray(data) ? data : []);
   return { listings: rawListings };
 }
 
@@ -291,9 +380,10 @@ export async function createOffer(
 export async function uploadOfferImages(offerId: string, files: File[]): Promise<any> {
   const formData = new FormData();
   files.forEach((file) => {
-    formData.append("image", file);
+    formData.append("images", file);
   });
   formData.append("offerID", offerId);
+  formData.append("offerId", offerId);
   return request("/offer/upload-images", { method: "POST", body: formData });
 }
 

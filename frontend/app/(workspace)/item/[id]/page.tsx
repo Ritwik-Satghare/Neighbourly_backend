@@ -3,21 +3,36 @@
 import { FormEvent, use, useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { getListingById as apiGetListingById } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { getListingById as apiGetListingById, normaliseId } from "@/lib/api";
+import { formatCurrency, getListingImage } from "@/lib/utils";
+import { getValidAuthToken, getCurrentUserId } from "@/lib/auth";
 import { listings as mockListings } from "@/lib/data";
 import type { Listing } from "@/lib/data";
 import { createReview, getReviewsByListing, type Review } from "@/services/review";
+import { createBookingMock } from "@/services/booking";
 
 type ItemPageProps = {
   params: Promise<{ id: string }>;
 };
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
 
 export default function ItemPage({ params }: ItemPageProps) {
   const { id } = use(params);
   const [item, setItem] = useState<Listing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [bookingStatus, setBookingStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [bookingMessage, setBookingMessage] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+
+  const [availabilitySlots, setAvailabilitySlots] = useState<any[]>([]);
+  const [pickupDate, setPickupDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -100,32 +115,52 @@ export default function ItemPage({ params }: ItemPageProps) {
       setIsLoading(true);
       setError("");
       try {
-        const data = (await apiGetListingById(id)) as any;
-        console.log("getListingById response:", data);
-        const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
-        const imageSrc =
-          data.image ??
-          data.imageUrl ??
-          data.images?.find((img: any) => img?.isPrimary)?.imageUrl ??
-          data.images?.[0]?.imageUrl ??
-          data.imageURLs?.[0] ??
-          FALLBACK_IMAGE;
-        try { console.log("Item image mapping:", { id: data._id ?? data.id, name: data.name ?? data.title, images: data.images, resolved: imageSrc }); } catch (e) {}
-        const listingId = data.id ?? data._id ?? id;
-        setItem({
-          id: listingId,
-          title: data.title ?? "",
+        const data = await apiGetListingById(id);
+        const rawId = normaliseId(data) ?? id;
+
+        let summaryText = data.summary ?? data.description ?? "";
+        let parsedSlots: any[] = [];
+        const marker = "\n\n[AvailabilitySlots]:";
+        if (summaryText.includes(marker)) {
+          const parts = summaryText.split(marker);
+          summaryText = parts[0];
+          try {
+            parsedSlots = JSON.parse(parts[1]);
+          } catch (e) {
+            console.error("Error parsing availability slots:", e);
+          }
+        }
+        setAvailabilitySlots(parsedSlots);
+
+        const mapped: Listing = {
+          id: rawId,
+          title: data.title ?? (data as any).name ?? "",
           category: data.category ?? "Tools",
           distance: data.distance ?? "0.8km away",
           pricePerDay: Number(data.pricePerDay ?? data.price_per_day ?? 0),
           rating: data.rating ?? 4.9,
           trustScore: data.trustScore ?? data.trust_score ?? 98,
-          image: imageSrc,
-          summary: data.summary ?? data.description ?? "",
+          image: getListingImage(data),
+          summary: summaryText,
           host: data.host ?? "Neighbor",
-        });
+        };
+        setItem(mapped);
 
-        await loadReviews(listingId);
+        // Check ownership
+        const currentUserId = getCurrentUserId();
+        const rawOwnerId =
+          (data as any).ownerID ??
+          (data as any).ownerId ??
+          (data as any).userId ??
+          (data as any).owner ??
+          null;
+        setOwnerId(rawOwnerId ? String(rawOwnerId) : null);
+        if (currentUserId && rawOwnerId) {
+          setIsOwner(String(currentUserId) === String(rawOwnerId));
+        }
+
+        // Load reviews for this listing
+        await loadReviews(rawId);
       } catch (err: any) {
         setError(err.message ?? "Failed to load item details.");
       } finally {
@@ -134,6 +169,53 @@ export default function ItemPage({ params }: ItemPageProps) {
     }
     loadItem();
   }, [id]);
+
+  async function handleRequestToRent() {
+    const token = getValidAuthToken();
+    if (!token) {
+      setBookingStatus("error");
+      setBookingMessage("You must be logged in to send a request.");
+      return;
+    }
+
+    if (!pickupDate || !returnDate) {
+      setBookingStatus("error");
+      setBookingMessage("Please select both Pickup and Return dates.");
+      return;
+    }
+
+    // Check that returnDate is after pickupDate
+    if (new Date(returnDate) < new Date(pickupDate)) {
+      setBookingStatus("error");
+      setBookingMessage("Return date must be on or after the pickup date.");
+      return;
+    }
+
+    setBookingStatus("loading");
+    setBookingMessage("");
+
+    try {
+      if (!item) {
+        throw new Error("No item details found.");
+      }
+
+      await createBookingMock(
+        item.id,
+        item.title,
+        item.image,
+        ownerId ?? "",
+        item.pricePerDay,
+        pickupDate,
+        returnDate
+      );
+
+      setBookingStatus("success");
+      setBookingMessage("Booking request sent! The owner will review it shortly.");
+    } catch (err: any) {
+      setBookingStatus("error");
+      setBookingMessage(err.message ?? "Something went wrong. Please try again.");
+    }
+  }
 
   if (isLoading) {
     return (
@@ -156,29 +238,56 @@ export default function ItemPage({ params }: ItemPageProps) {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+      {/* Left: Images + Details */}
       <section className="grid gap-8">
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <div className="relative min-h-[420px] overflow-hidden rounded-[2rem]">
-            <Image alt={item.title} className="object-cover" fill sizes="(max-width: 1024px) 100vw, 60vw" src={item.image} />
+            <Image
+              alt={item.title}
+              className="object-cover"
+              fill
+              sizes="(max-width: 1024px) 100vw, 60vw"
+              src={item.image}
+            />
           </div>
           <div className="grid gap-4">
             {mockListings.slice(1, 3).map((listing) => (
-              <div key={listing.id} className="relative min-h-[200px] overflow-hidden rounded-[1.5rem]">
-                <Image alt={listing.title} className="object-cover" fill sizes="(max-width: 1024px) 100vw, 25vw" src={listing.image} />
+              <div
+                key={listing.id}
+                className="relative min-h-[200px] overflow-hidden rounded-[1.5rem]"
+              >
+                <Image
+                  alt={listing.title}
+                  className="object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 25vw"
+                  src={listing.image}
+                />
               </div>
             ))}
           </div>
         </div>
+
         <div className="rounded-[2rem] bg-surface-card p-8 shadow-ambient">
           <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">{item.category}</p>
-              <h1 className="mt-3 font-headline text-4xl font-extrabold text-ink-strong">{item.title}</h1>
-              <p className="mt-3 max-w-2xl text-base text-ink-soft">{item.summary}</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+                {item.category}
+              </p>
+              <h1 className="mt-3 font-headline text-4xl font-extrabold text-ink-strong">
+                {item.title}
+              </h1>
+              <p className="mt-3 max-w-2xl text-base text-ink-soft">
+                {item.summary}
+              </p>
             </div>
             <div className="rounded-[1.5rem] bg-secondary-container px-5 py-4 text-secondary">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Trust score</p>
-              <p className="font-headline text-4xl font-extrabold">{item.trustScore}%</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
+                Trust score
+              </p>
+              <p className="font-headline text-4xl font-extrabold">
+                {item.trustScore}%
+              </p>
             </div>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -188,10 +297,33 @@ export default function ItemPage({ params }: ItemPageProps) {
               ["Category", item.category],
             ].map(([label, value]) => (
               <div key={label} className="rounded-[1.5rem] bg-surface-low p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">{label}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
+                  {label}
+                </p>
                 <p className="mt-2 font-semibold text-ink-strong">{value}</p>
               </div>
             ))}
+          </div>
+
+          {/* Availability slots details */}
+          <div className="mt-8 border-t border-outline/20 pt-6">
+            <h3 className="text-lg font-bold text-ink-strong">Lender's Available Slots</h3>
+            <p className="text-xs text-ink-soft mt-1 mb-4">The lender has marked these slots/dates as free for rental handoff:</p>
+            {availabilitySlots && availabilitySlots.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {availabilitySlots.map((slot: any) => (
+                  <div key={slot.id || Math.random()} className="rounded-2xl bg-primary-fixed/20 border border-primary/10 px-4 py-2 text-sm text-primary font-medium">
+                    {slot.type === "weekly" ? (
+                      <span>Weekly: {slot.startDay} – {slot.endDay}</span>
+                    ) : (
+                      <span>Dates: {slot.startDate} to {slot.endDate}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-muted italic">No specific availability slots declared. Please coordinate pickup directly.</p>
+            )}
           </div>
         </div>
 
@@ -283,27 +415,75 @@ export default function ItemPage({ params }: ItemPageProps) {
         </div>
       </section>
 
+      {/* Right: Booking sidebar */}
       <aside className="h-fit rounded-[2rem] bg-surface-card p-8 shadow-ambient lg:sticky lg:top-28">
         <div className="flex items-end justify-between">
           <div>
             <p className="text-sm text-ink-soft">Starting at</p>
-            <p className="font-headline text-4xl font-extrabold text-primary">{formatCurrency(item.pricePerDay)}</p>
+            <p className="font-headline text-4xl font-extrabold text-primary">
+              {formatCurrency(item.pricePerDay)}
+            </p>
           </div>
-          <div className="rounded-full bg-primary-fixed px-4 py-2 text-sm font-semibold text-primary">Excellent</div>
+          <div className="rounded-full bg-primary-fixed px-4 py-2 text-sm font-semibold text-primary">
+            Excellent
+          </div>
         </div>
+
         <div className="mt-8 grid gap-4">
-          <div className="rounded-[1.5rem] bg-surface-low p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">Pick up</p>
-            <p className="mt-2 font-semibold text-ink-strong">Saturday, 10:00 AM</p>
-          </div>
-          <div className="rounded-[1.5rem] bg-surface-low p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">Return</p>
-            <p className="mt-2 font-semibold text-ink-strong">Monday, 6:00 PM</p>
-          </div>
-          <Button className="w-full justify-center" href="/messages">
-            Request to Rent
-          </Button>
-          <Button className="w-full justify-center" href="/verify" variant="secondary">
+          <label className="grid gap-2 rounded-[1.5rem] bg-surface-low p-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft cursor-pointer">
+            <span>Pick up Date</span>
+            <input
+              type="date"
+              value={pickupDate}
+              onChange={(e) => setPickupDate(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-transparent bg-white p-3 text-sm font-semibold text-ink-strong outline-none focus:border-primary/40 normal-case tracking-normal"
+            />
+          </label>
+          <label className="grid gap-2 rounded-[1.5rem] bg-surface-low p-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft cursor-pointer">
+            <span>Return Date</span>
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-transparent bg-white p-3 text-sm font-semibold text-ink-strong outline-none focus:border-primary/40 normal-case tracking-normal"
+            />
+          </label>
+
+          {/* Booking feedback */}
+          {bookingStatus === "success" && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800">
+              {bookingMessage}
+            </div>
+          )}
+          {bookingStatus === "error" && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800">
+              {bookingMessage}
+            </div>
+          )}
+
+          {isOwner ? (
+            <div className="rounded-xl bg-surface-low p-4 text-center text-sm text-ink-soft">
+              You listed this item — you cannot request to rent it.
+            </div>
+          ) : (
+            <Button
+              className="w-full justify-center"
+              onClick={handleRequestToRent}
+              disabled={bookingStatus === "loading" || bookingStatus === "success"}
+            >
+              {bookingStatus === "loading"
+                ? "Sending request..."
+                : bookingStatus === "success"
+                ? "Request sent ✓"
+                : "Request to Rent"}
+            </Button>
+          )}
+
+          <Button
+            className="w-full justify-center"
+            href="/verify"
+            variant="secondary"
+          >
             Verify condition first
           </Button>
         </div>
