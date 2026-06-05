@@ -66,6 +66,7 @@ export const workspaceNav: NavItem[] = [
   { href: "/home", label: "Home" },
   { href: "/browse", label: "Browse" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/booking", label: "Bookings" },
   { href: "/lender-dashboard", label: "Lender Dashboard" },
   { href: "/split-ownership", label: "Split Ownership" },
   { href: "/verify", label: "Verify" },
@@ -208,6 +209,7 @@ export const notifications = [
 export const dashboardLinks = [
   { href: "/home", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/booking", label: "Bookings" },
   { href: "/browse", label: "Browse" },
   { href: "/lender-dashboard", label: "Lender Dashboard" },
   { href: "/split-ownership", label: "Split Ownership" },
