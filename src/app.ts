@@ -64,6 +64,7 @@ import conversationRoutes from './routes/conversation_routes';
 import messageRoutes from './routes/message_routes';
 import reviewRoutes from './routes/review_routes';
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 
 const app = express();
 
@@ -74,6 +75,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/user', userRoutes);
 app.use('/listing', listingRoutes);
 app.use('/offer', offerRoutes);
 app.use('/booking', bookingRoutes);
