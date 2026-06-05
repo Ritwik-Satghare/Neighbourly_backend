@@ -6,7 +6,7 @@ import { ListingCard } from "@/components/listing-card";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
 import { categories } from "@/lib/data";
-import { getAllPublicListings, searchListings } from "@/lib/api";
+import { getAllPublicListings, searchListings, normaliseId } from "@/lib/api";
 import type { Listing } from "@/lib/data";
 import { getListingImage } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -42,9 +42,13 @@ export default function BrowsePage() {
   });
 
   useEffect(() => {
-    async function fetchListings() {
-      setIsLoading(true);
-      setError("");
+    let active = true;
+
+    async function fetchListings(isInitial = false) {
+      if (isInitial) {
+        setIsLoading(true);
+        setError("");
+      }
       try {
         const response =
           selectedCategory || searchTerm
@@ -54,18 +58,18 @@ export default function BrowsePage() {
               })
             : await getAllPublicListings(1, 1000);
 
+        if (!active) return;
         const listingsArray = response.listings ?? [];
         const mappedListings: Listing[] = listingsArray.map((item: any) => {
-          // Normalise ID or fallback if the backend forgot to send it.
-          const rawId =
-            item.id ??
-            item._id?.$oid ??
-            (typeof item._id === "string" ? item._id : null) ??
-            (item._id ? String(item._id) : null) ??
+          const rawId = normaliseId(item);
+          if (!rawId) {
+            console.warn("[BrowsePage] normaliseId returned null for item:", item);
+          }
+          const finalId = rawId ??
             Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 
           return {
-            id: rawId,
+            id: finalId,
             title: item.title ?? item.name ?? "",
             category: item.category ?? "Tools",
             distance: item.distance ?? "",
@@ -82,15 +86,29 @@ export default function BrowsePage() {
 
         setListings(mappedListings);
       } catch (err: any) {
+        if (!active) return;
         console.error("Failed to fetch listings:", err);
-        setError(err?.message ?? "Failed to load listings.");
-        // Clear listings on error to avoid stale data
-        setListings([]);
+        if (isInitial) {
+          setError(err?.message ?? "Failed to load listings.");
+          setListings([]);
+        }
       } finally {
-        setIsLoading(false);
+        if (active && isInitial) {
+          setIsLoading(false);
+        }
       }
     }
-    fetchListings();
+
+    fetchListings(true);
+
+    const interval = setInterval(() => {
+      fetchListings(false);
+    }, 5000); // Poll every 5 seconds
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [selectedCategory, searchTerm]);
 
   const handleCategoryClick = (categoryName: string) => {

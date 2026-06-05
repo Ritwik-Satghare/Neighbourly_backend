@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatsCard } from "@/components/stats-card";
 import { EmptyState } from "@/components/empty-state";
 import { getBookings, MockBooking } from "@/services/booking";
-import { getUserListings, deleteListing } from "@/lib/api";
+import { getUserListings, deleteListing, normaliseId } from "@/lib/api";
 import { getStoredUser, getCurrentUserId } from "@/lib/auth";
 import type { UserListing } from "@/lib/data";
 import { getListingImage } from "@/lib/utils";
@@ -20,9 +20,11 @@ export default function LenderDashboardPage() {
 
   const currentUser = getStoredUser();
 
-  const loadListings = async () => {
-    setIsLoading(true);
-    setError("");
+  const loadListings = async (isInitial = false) => {
+    if (isInitial) {
+      setIsLoading(true);
+      setError("");
+    }
     try {
       const currentTokenId = getCurrentUserId();
       const currentId = currentTokenId ?? currentUser?.id ?? currentUser?._id;
@@ -34,7 +36,7 @@ export default function LenderDashboardPage() {
       const response = await getUserListings(currentId);
       
       const mapped = (response.listings ?? []).map((item: any) => ({
-        id: item.id ?? item._id ?? String(Math.random()),
+        id: normaliseId(item) ?? String(Math.random()),
         title: item.title ?? item.name ?? "",
         pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
         status: item.status ?? "Active",
@@ -49,15 +51,25 @@ export default function LenderDashboardPage() {
 
       setUserListings(mapped);
     } catch (err: any) {
-      setError(err.message ?? "Failed to fetch listings");
-      setUserListings([]);
+      if (isInitial) {
+        setError(err.message ?? "Failed to fetch listings");
+        setUserListings([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (isInitial) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadListings();
+    loadListings(true);
+
+    const interval = setInterval(() => {
+      loadListings(false);
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleDelete = async (id: string) => {

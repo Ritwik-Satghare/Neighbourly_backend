@@ -9,7 +9,7 @@ import { StatsCard } from "@/components/stats-card";
 import { OwnerListingCard } from "@/components/owner-listing-card";
 import { EmptyState } from "@/components/empty-state";
 
-import { getUserListings, deleteListing } from "@/lib/api";
+import { getUserListings, deleteListing, normaliseId } from "@/lib/api";
 import { getBookings } from "@/services/booking";
 import { clearAuthSession, getStoredUser, getCurrentUserId } from "@/lib/auth";
 import { getListingImage } from "@/lib/utils";
@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
         const response = await getUserListings(currentId);
         const mapped = (response.listings ?? []).map((item: any) => ({
-          id: item.id ?? item._id ?? String(Math.random()),
+          id: normaliseId(item) ?? String(Math.random()),
           title: item.title ?? item.name ?? "",
           pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
           status: item.status ?? "Active",

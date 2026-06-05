@@ -3,12 +3,13 @@
 import { FormEvent, use, useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { getListingById as apiGetListingById } from "@/lib/api";
+import { getListingById as apiGetListingById, normaliseId } from "@/lib/api";
 import { formatCurrency, getListingImage } from "@/lib/utils";
 import { getValidAuthToken, getCurrentUserId } from "@/lib/auth";
 import { listings as mockListings } from "@/lib/data";
 import type { Listing } from "@/lib/data";
 import { createReview, getReviewsByListing, type Review } from "@/services/review";
+import { createBookingMock } from "@/services/booking";
 
 type ItemPageProps = {
   params: Promise<{ id: string }>;
@@ -27,6 +28,7 @@ export default function ItemPage({ params }: ItemPageProps) {
   >("idle");
   const [bookingMessage, setBookingMessage] = useState("");
   const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -110,11 +112,7 @@ export default function ItemPage({ params }: ItemPageProps) {
       setError("");
       try {
         const data = await apiGetListingById(id);
-        const rawId =
-          data.id ??
-          (data as any)._id?.$oid ??
-          (typeof data._id === "string" ? data._id : null) ??
-          (data._id ? String(data._id) : id);
+        const rawId = normaliseId(data) ?? id;
 
         const mapped: Listing = {
           id: rawId,
@@ -132,13 +130,15 @@ export default function ItemPage({ params }: ItemPageProps) {
 
         // Check ownership
         const currentUserId = getCurrentUserId();
-        const ownerId =
+        const rawOwnerId =
+          (data as any).ownerID ??
           (data as any).ownerId ??
           (data as any).userId ??
           (data as any).owner ??
           null;
-        if (currentUserId && ownerId) {
-          setIsOwner(String(currentUserId) === String(ownerId));
+        setOwnerId(rawOwnerId ? String(rawOwnerId) : null);
+        if (currentUserId && rawOwnerId) {
+          setIsOwner(String(currentUserId) === String(rawOwnerId));
         }
 
         // Load reviews for this listing
@@ -164,20 +164,17 @@ export default function ItemPage({ params }: ItemPageProps) {
     setBookingMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/booking/create`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ listingId: id }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message ?? data.error ?? "Failed to create booking.");
+      if (!item) {
+        throw new Error("No item details found.");
       }
+
+      await createBookingMock(
+        item.id,
+        item.title,
+        item.image,
+        ownerId ?? "",
+        item.pricePerDay
+      );
 
       setBookingStatus("success");
       setBookingMessage("Booking request sent! The owner will review it shortly.");

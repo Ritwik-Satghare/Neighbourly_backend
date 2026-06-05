@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { OwnerListingCard } from "@/components/owner-listing-card";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { getUserListings } from "@/lib/api";
+import { getUserListings, normaliseId } from "@/lib/api";
 import { getCurrentUserId, getStoredUser } from "@/lib/auth";
 import type { UserListing } from "@/lib/data";
 import { getListingImage } from "@/lib/utils";
@@ -36,7 +36,7 @@ export default function MyListingsPage() {
         console.log("My listings response count:", listingsData.length);
         const mapped = listingsData.map((item: any) => {
           return {
-            id: item.id ?? item._id ?? String(Math.random()),
+            id: normaliseId(item) ?? String(Math.random()),
             title: item.title ?? item.name ?? "",
             pricePerDay: Number(item.pricePerDay ?? item.price_per_day ?? 0),
             status: item.status ?? "Active",

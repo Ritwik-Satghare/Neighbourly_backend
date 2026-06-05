@@ -2,15 +2,41 @@ import { getValidAuthToken, getCurrentUserId } from "@/lib/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/api";
 
-/** Safely extract a plain-string ID from a MongoDB document, handling ObjectId wrappers. */
 export function normaliseId(item: any): string | null {
-  const raw =
-    item?.id ??
-    item?._id?.$oid ??
-    (typeof item?._id === "string" ? item._id : null) ??
-    (item?._id ? String(item._id) : null);
-  if (!raw || raw.includes(".")) return null;
-  return raw;
+  if (!item) return null;
+  
+  const candidates = [
+    item?.id,
+    item?._id,
+    item?.listingId,
+    item?.listingID,
+    item?.data?.id,
+    item?.data?._id,
+    item?.listing?.id,
+    item?.listing?._id
+  ];
+
+  for (const val of candidates) {
+    if (!val) continue;
+    
+    if (typeof val === "string" && !val.includes(".")) {
+      return val;
+    }
+    
+    if (typeof val === "object" && typeof (val as any).$oid === "string") {
+      return (val as any).$oid;
+    }
+    
+    if (typeof val === "object") {
+      const str = String(val);
+      if (str && str !== "[object Object]" && !str.includes(".")) {
+        return str;
+      }
+    }
+  }
+
+  console.warn("[normaliseId] failed to normalise ID for item:", item);
+  return null;
 }
 
 
@@ -95,6 +121,7 @@ export type ListingResponse = {
   images?: string[];
   host?: string;
   ownerId?: string;
+  ownerID?: string;
   trustScore?: number;
   distance?: string;
   rating?: number;
@@ -102,6 +129,7 @@ export type ListingResponse = {
   price_per_day?: number;
   trust_score?: number;
   description?: string;
+  name?: string;
 };
 
 // ─── Listing helpers ──────────────────────────────────────────────────────────
@@ -141,29 +169,61 @@ export async function createListing(
     body: JSON.stringify(apiPayload),
   });
 
+  const listingData = response.listing ?? response.data ?? response;
   return {
-    listing: response.listing ?? response.data ?? response,
-    id: response.listing?.id ?? response.id ?? response.data?.id,
+    listing: listingData,
+    id: normaliseId(listingData) ?? "",
   };
 }
 
-/**
- * Uploads images for a listing.
- */
 export async function uploadImages(listingId: string, files: File[]): Promise<any> {
-  const formData = new FormData();
-  files.forEach((file) => {
-    formData.append("images", file);
-  });
-  formData.append("listingID", listingId);
-  formData.append("listingId", listingId);
+  try {
+    // Option A: Single request with field name 'images' (plural) and both listingID/listingId
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("images", file);
+    });
+    formData.append("listingID", listingId);
+    formData.append("listingId", listingId);
 
-  // Do NOT set Content-Type manually for FormData – the browser adds the
-  // multipart boundary automatically.
-  return request("/listing/upload-images", {
-    method: "POST",
-    body: formData,
-  });
+    return await request("/listing/upload-images", {
+      method: "POST",
+      body: formData,
+    });
+  } catch (err) {
+    console.warn("Upload with field name 'images' failed, retrying with field 'image'...", err);
+    
+    try {
+      // Option B: Single request with field name 'image' (singular) and both listingID/listingId
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append("image", file);
+      });
+      formData.append("listingID", listingId);
+      formData.append("listingId", listingId);
+
+      return await request("/listing/upload-images", {
+        method: "POST",
+        body: formData,
+      });
+    } catch (err2) {
+      console.warn("Upload with single request field 'image' failed, retrying with individual requests...", err2);
+      
+      // Option C: Individual requests with field name 'image' (singular)
+      const uploadPromises = files.map((file) => {
+        const formData = new FormData();
+        formData.append("image", file);
+        formData.append("listingID", listingId);
+        formData.append("listingId", listingId);
+
+        return request("/listing/upload-images", {
+          method: "POST",
+          body: formData,
+        });
+      });
+      return Promise.all(uploadPromises);
+    }
+  }
 }
 
 /**
