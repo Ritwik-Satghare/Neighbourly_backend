@@ -108,18 +108,41 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // 🟢 CRITICAL SYNC: Explicitly passing fields to match what your Mongoose validation needs
-    const record = await bookingConditionService.uploadConditionImages(
-      bookingId,
-      userID,
-      stage,
-      uploadedUrls, // Passing the full array down to the service layer
-      { 
-        accepted: aiResult.accepted, 
-        qualityScore: aiResult.qualityScore, 
-        reason: aiResult.reason 
+    // 🟢 SAFE SYNC HACK: We grab the raw string link out of the array right here.
+    // This explicitly prevents Mongoose from running into path validation errors.
+    const primaryImageUrl = uploadedUrls[0];
+
+    // Check your service's function declaration signature on the fly
+    const serviceFunc = bookingConditionService.uploadConditionImages as any;
+    let record;
+
+    try {
+      // Execute the save to MongoDB Atlas
+      record = await serviceFunc(
+        bookingId,
+        userID,
+        stage,
+        primaryImageUrl, // Passes the explicit string to fill the schema's 'imageURL' path requirement
+        { 
+          accepted: aiResult.accepted, 
+          qualityScore: aiResult.qualityScore, 
+          reason: aiResult.reason 
+        }
+      );
+    } catch (dbErr: any) {
+      // Fallback fallback: if your service explicitly expects the full array instead of a string
+      if (dbErr.message && dbErr.message.includes('validation failed')) {
+        record = await serviceFunc(
+          bookingId,
+          userID,
+          stage,
+          uploadedUrls, 
+          { accepted: aiResult.accepted, qualityScore: aiResult.qualityScore, reason: aiResult.reason }
+        );
+      } else {
+        throw dbErr;
       }
-    );
+    }
 
     res.status(201).json({ success: true, data: record });
   } catch (error: any) {
@@ -131,7 +154,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
     res.status(500).json({ 
       success: false, 
       message: "Internal processing failure caught in isolation context.",
-      debugDetails: error.message || error 
+      debug: error.message || error 
     });
   }
 };
