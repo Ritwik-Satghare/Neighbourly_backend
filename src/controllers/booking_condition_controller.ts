@@ -1,27 +1,20 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth_middleware';
-import * as bookingConditionService from '../services/booking_condition_service';
+import * as bookingConditionService from '../services/booking_condition_service'; 
+import { uploadToCloudinary, deleteFromCloudinary, extractPublicId } from '../utils/cloudinary_upload';
+import { validateImageQuality } from '../services/image_quality_service';
 import { z } from 'zod';
 
-// ─── Validation Schemas ──────────────────────────────────────────────────────
-
 export const uploadConditionSchema = z.object({
+  params: z.object({
+    bookingId: z.string().min(1, 'Booking ID is required'),
+  }),
   body: z.object({
-    bookingID: z.string().min(1, 'Booking ID is required'),
-    imageURL: z.string().url('Image URL must be a valid URL'),
-    stage: z.enum(['before', 'after'], {
-      errorMap: () => ({ message: "Stage must be 'before' or 'after'" }),
-    }),
+    stage: z.enum(['before', 'after'], { required_error: "Stage must be 'before' or 'after'" }),
     notes: z.string().optional(),
   }),
 });
 
-// ─── Controllers ─────────────────────────────────────────────────────────────
-
-/**
- * POST /booking/upload-condition
- * Upload a before/after condition image for a booking.
- */
 export const uploadConditionImage = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userID = req.user?.id;
@@ -30,35 +23,72 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const { bookingID, imageURL, stage, notes } = req.body;
+    const { bookingId } = req.params;
+    const { stage } = req.body as { stage?: 'before' | 'after' };
 
-    const conditionImage = await bookingConditionService.uploadConditionImage(
-      bookingID,
+    if (!bookingId) {
+      res.status(400).json({ success: false, message: 'bookingId parameter is required' });
+      return;
+    }
+    if (!stage || (stage !== 'before' && stage !== 'after')) {
+      res.status(400).json({ success: false, message: "body.stage must be 'before' or 'after'" });
+      return;
+    }
+
+    const files = (req.files as Express.Multer.File[]) || [];
+    if (!files.length) {
+      res.status(400).json({ success: false, message: 'No files uploaded.' });
+      return;
+    }
+
+    const uploadedUrls: string[] = [];
+    for (const f of files) {
+      const resp = await uploadToCloudinary(f.path);
+      const anyResp = resp as any;
+      if (resp && (anyResp.secure_url || anyResp.url)) {
+        uploadedUrls.push(anyResp.secure_url || anyResp.url);
+      }
+    }
+
+    let aiResult;
+    try {
+      aiResult = await validateImageQuality(uploadedUrls);
+    } catch (aiErr) {
+      console.error('AI validation error, proceeding:', aiErr);
+      aiResult = { accepted: true, qualityScore: 1.0 };
+    }
+
+    if (!aiResult.accepted) {
+      for (const url of uploadedUrls) {
+        try {
+          const publicId = extractPublicId(url);
+          if (publicId) await deleteFromCloudinary(publicId);
+        } catch (delErr) {
+          console.error('Failed to delete cloudinary image:', delErr);
+        }
+      }
+      res.status(400).json({ success: false, message: aiResult.reason || 'Image validation failed' });
+      return;
+    }
+
+    const record = await bookingConditionService.uploadConditionImages(
+      bookingId,
       userID,
-      { imageURL, stage, notes }
+      stage,
+      uploadedUrls,
+      { accepted: aiResult.accepted, qualityScore: aiResult.qualityScore, reason: aiResult.reason }
     );
 
-    res.status(201).json({
-      success: true,
-      message: `Condition image (${stage}) uploaded successfully`,
-      data: conditionImage,
-    });
+    res.status(201).json({ success: true, data: record });
   } catch (error: any) {
-    if (error.message.includes('Forbidden')) {
+    if (error.message && error.message.includes('Forbidden')) {
       res.status(403).json({ success: false, message: error.message });
       return;
     }
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Error uploading condition image',
-    });
+    res.status(400).json({ success: false, message: error.message || 'Error uploading images' });
   }
 };
 
-/**
- * GET /booking/condition/:bookingID
- * Get all condition images for a booking.
- */
 export const getConditionImages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userID = req.user?.id;
@@ -67,27 +97,20 @@ export const getConditionImages = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
-    const images = await bookingConditionService.getConditionImages(
-      req.params.bookingID,
-      userID
-    );
+    const { bookingId } = req.params;
+    if (!bookingId) {
+      res.status(400).json({ success: false, message: 'bookingId parameter is required' });
+      return;
+    }
 
-    res.status(200).json({
-      success: true,
-      data: images,
-    });
+    const data = await bookingConditionService.getBookingConditions(bookingId, userID);
+
+    res.status(200).json({ success: true, data });
   } catch (error: any) {
-    if (error.message.includes('Forbidden')) {
+    if (error.message && error.message.includes('Forbidden')) {
       res.status(403).json({ success: false, message: error.message });
       return;
     }
-    if (error.message.includes('not found')) {
-      res.status(404).json({ success: false, message: error.message });
-      return;
-    }
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Error fetching condition images',
-    });
+    res.status(400).json({ success: false, message: error.message || 'Error fetching conditions' });
   }
 };

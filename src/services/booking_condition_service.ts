@@ -7,10 +7,6 @@ interface AIResult {
   reason?: string;
 }
 
-/**
- * Upload condition images for a booking.
- * Synchronizes with the controller layout to save arrays of secure URLs and Gemini AI analysis metrics.
- */
 export const uploadConditionImages = async (
   bookingID: string,
   userID: string,
@@ -23,7 +19,6 @@ export const uploadConditionImages = async (
 
   const listing = booking.listingID as any;
 
-  // Authorization: Ensure the active token belongs to either the renter or the listing owner
   const isRenter = booking.renterID.toString() === userID;
   const isOwner = listing && (listing.ownerID === userID || listing.ownerID?.toString() === userID);
 
@@ -31,7 +26,6 @@ export const uploadConditionImages = async (
     throw new Error('Forbidden: You are not authorized to upload images for this booking');
   }
 
-  // Lifecycle Validation Gateways
   if (booking.status === 'pending') {
     throw new Error('Cannot upload condition images for a pending booking. Booking must be confirmed first.');
   }
@@ -42,12 +36,10 @@ export const uploadConditionImages = async (
     throw new Error('Cannot upload "before" images for a completed booking');
   }
 
-  // Persist the batch arrays into your MongoDB collection
-  // If your model takes a single imageURL string, we map over the array or pass the array directly based on your schema layout
   const record = await BookingConditionImage.create({
     bookingID,
     uploadedBy: userID,
-    imageURLs: imageUrls, // Supports multi-image upload arrays flawlessly
+    imageURLs: imageUrls,
     stage,
     aiReview: {
       accepted: aiReview.accepted,
@@ -59,9 +51,6 @@ export const uploadConditionImages = async (
   return record;
 };
 
-/**
- * Retrieves all registered condition cards and metrics for a specified booking ID.
- */
 export const getBookingConditions = async (bookingID: string, userID: string) => {
   const booking = await Booking.findById(bookingID).populate('listingID');
   if (!booking) throw new Error('Booking not found');
