@@ -4,6 +4,7 @@ import * as bookingConditionService from '../services/booking_condition_service'
 import { uploadToCloudinary, deleteFromCloudinary, extractPublicId } from '../utils/cloudinary_upload';
 import { validateImageQuality } from '../services/image_quality_service';
 import { z } from 'zod';
+import fs from 'fs';
 
 export const uploadConditionSchema = z.object({
   params: z.object({
@@ -43,10 +44,26 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
 
     const uploadedUrls: string[] = [];
     for (const f of files) {
-      const resp = await uploadToCloudinary(f.path);
+      let uploadTarget: string;
+
+      // Safe check: If Multer uses memoryStorage, convert the buffer to a base64 Data URI string for Cloudinary
+      if (f.buffer) {
+        const base64Data = f.buffer.toString('base64');
+        uploadTarget = `data:${f.mimetype};base64,${base64Data}`;
+      } else {
+        // Fallback for local diskStorage testing
+        uploadTarget = f.path;
+      }
+
+      const resp = await uploadToCloudinary(uploadTarget);
       const anyResp = resp as any;
       if (resp && (anyResp.secure_url || anyResp.url)) {
         uploadedUrls.push(anyResp.secure_url || anyResp.url);
+      }
+
+      // Clean up local temp files if diskStorage was used
+      if (!f.buffer && f.path && fs.existsSync(f.path)) {
+        fs.unlinkSync(f.path);
       }
     }
 
