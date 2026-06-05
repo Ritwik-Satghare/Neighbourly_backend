@@ -19,6 +19,8 @@ export interface MockBooking {
   status: "pending" | "active" | "completed" | "canceled";
   pricePerDay: number;
   createdAt: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 function getMockBookings(): MockBooking[] {
@@ -213,7 +215,9 @@ export const createBookingMock = async (
   itemTitle: string, 
   itemImage: string, 
   ownerId: string, 
-  pricePerDay: number
+  pricePerDay: number,
+  startDate?: string,
+  endDate?: string
 ) => {
   const token = getAuthToken();
   if (token) {
@@ -226,8 +230,8 @@ export const createBookingMock = async (
       body: JSON.stringify({
         listingID: listingId,
         amount: pricePerDay,
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        startDate: startDate || new Date().toISOString(),
+        endDate: endDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         note: "Request to rent"
       }),
     });
@@ -254,7 +258,9 @@ export const createBookingMock = async (
     ownerId: String(ownerId),
     status: "pending",
     pricePerDay,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    startDate: startDate || new Date().toISOString(),
+    endDate: endDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   };
 
   const allBookings = getMockBookings();

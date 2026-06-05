@@ -30,6 +30,10 @@ export default function ItemPage({ params }: ItemPageProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [ownerId, setOwnerId] = useState<string | null>(null);
 
+  const [availabilitySlots, setAvailabilitySlots] = useState<any[]>([]);
+  const [pickupDate, setPickupDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
@@ -114,6 +118,20 @@ export default function ItemPage({ params }: ItemPageProps) {
         const data = await apiGetListingById(id);
         const rawId = normaliseId(data) ?? id;
 
+        let summaryText = data.summary ?? data.description ?? "";
+        let parsedSlots: any[] = [];
+        const marker = "\n\n[AvailabilitySlots]:";
+        if (summaryText.includes(marker)) {
+          const parts = summaryText.split(marker);
+          summaryText = parts[0];
+          try {
+            parsedSlots = JSON.parse(parts[1]);
+          } catch (e) {
+            console.error("Error parsing availability slots:", e);
+          }
+        }
+        setAvailabilitySlots(parsedSlots);
+
         const mapped: Listing = {
           id: rawId,
           title: data.title ?? (data as any).name ?? "",
@@ -123,7 +141,7 @@ export default function ItemPage({ params }: ItemPageProps) {
           rating: data.rating ?? 4.9,
           trustScore: data.trustScore ?? data.trust_score ?? 98,
           image: getListingImage(data),
-          summary: data.summary ?? data.description ?? "",
+          summary: summaryText,
           host: data.host ?? "Neighbor",
         };
         setItem(mapped);
@@ -160,6 +178,19 @@ export default function ItemPage({ params }: ItemPageProps) {
       return;
     }
 
+    if (!pickupDate || !returnDate) {
+      setBookingStatus("error");
+      setBookingMessage("Please select both Pickup and Return dates.");
+      return;
+    }
+
+    // Check that returnDate is after pickupDate
+    if (new Date(returnDate) < new Date(pickupDate)) {
+      setBookingStatus("error");
+      setBookingMessage("Return date must be on or after the pickup date.");
+      return;
+    }
+
     setBookingStatus("loading");
     setBookingMessage("");
 
@@ -173,7 +204,9 @@ export default function ItemPage({ params }: ItemPageProps) {
         item.title,
         item.image,
         ownerId ?? "",
-        item.pricePerDay
+        item.pricePerDay,
+        pickupDate,
+        returnDate
       );
 
       setBookingStatus("success");
@@ -270,6 +303,27 @@ export default function ItemPage({ params }: ItemPageProps) {
                 <p className="mt-2 font-semibold text-ink-strong">{value}</p>
               </div>
             ))}
+          </div>
+
+          {/* Availability slots details */}
+          <div className="mt-8 border-t border-outline/20 pt-6">
+            <h3 className="text-lg font-bold text-ink-strong">Lender's Available Slots</h3>
+            <p className="text-xs text-ink-soft mt-1 mb-4">The lender has marked these slots/dates as free for rental handoff:</p>
+            {availabilitySlots && availabilitySlots.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {availabilitySlots.map((slot: any) => (
+                  <div key={slot.id || Math.random()} className="rounded-2xl bg-primary-fixed/20 border border-primary/10 px-4 py-2 text-sm text-primary font-medium">
+                    {slot.type === "weekly" ? (
+                      <span>Weekly: {slot.startDay} – {slot.endDay}</span>
+                    ) : (
+                      <span>Dates: {slot.startDate} to {slot.endDate}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-muted italic">No specific availability slots declared. Please coordinate pickup directly.</p>
+            )}
           </div>
         </div>
 
@@ -376,18 +430,24 @@ export default function ItemPage({ params }: ItemPageProps) {
         </div>
 
         <div className="mt-8 grid gap-4">
-          <div className="rounded-[1.5rem] bg-surface-low p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
-              Pick up
-            </p>
-            <p className="mt-2 font-semibold text-ink-strong">Saturday, 10:00 AM</p>
-          </div>
-          <div className="rounded-[1.5rem] bg-surface-low p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
-              Return
-            </p>
-            <p className="mt-2 font-semibold text-ink-strong">Monday, 6:00 PM</p>
-          </div>
+          <label className="grid gap-2 rounded-[1.5rem] bg-surface-low p-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft cursor-pointer">
+            <span>Pick up Date</span>
+            <input
+              type="date"
+              value={pickupDate}
+              onChange={(e) => setPickupDate(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-transparent bg-white p-3 text-sm font-semibold text-ink-strong outline-none focus:border-primary/40 normal-case tracking-normal"
+            />
+          </label>
+          <label className="grid gap-2 rounded-[1.5rem] bg-surface-low p-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft cursor-pointer">
+            <span>Return Date</span>
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-transparent bg-white p-3 text-sm font-semibold text-ink-strong outline-none focus:border-primary/40 normal-case tracking-normal"
+            />
+          </label>
 
           {/* Booking feedback */}
           {bookingStatus === "success" && (

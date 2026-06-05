@@ -54,13 +54,6 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         <p className="mt-2 text-sm text-white/80">
           Turn underused gear into trusted local income.
         </p>
-        <Link
-          href="/create-listing"
-          onClick={onClose}
-          className="mt-4 inline-block rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-primary"
-        >
-          Create listing
-        </Link>
         <Button onClick={handleSignOut} variant="secondary" className="mt-4 w-full">
           Sign Out
         </Button>

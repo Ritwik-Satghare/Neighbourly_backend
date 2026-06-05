@@ -94,6 +94,7 @@ export type CreateListingPayload = {
   pricePerDay: number;
   neighborhood?: string;
   conditionNotes?: string;
+  availabilitySlots?: any[];
 };
 
 export type SearchParams = {
@@ -147,11 +148,18 @@ export async function createListing(
   const userId = getCurrentUserId();
 
   // Build the payload the backend expects.
+  let finalDescription = payload.summary;
+  if (payload.availabilitySlots && payload.availabilitySlots.length > 0) {
+    finalDescription += `\n\n[AvailabilitySlots]:${JSON.stringify(payload.availabilitySlots)}`;
+  }
+
   const apiPayload: Record<string, unknown> = {
     name: payload.title,
     category: payload.category,
-    description: payload.summary,
+    description: finalDescription,
     pricePerDay: payload.pricePerDay,
+    availability: payload.availabilitySlots || [],
+    availability_slots: payload.availabilitySlots || [],
   };
 
   // Only include optional fields when they have a value.
