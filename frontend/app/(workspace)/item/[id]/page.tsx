@@ -100,7 +100,7 @@ export default function ItemPage({ params }: ItemPageProps) {
       setIsLoading(true);
       setError("");
       try {
-        const data = await apiGetListingById(id);
+        const data = (await apiGetListingById(id)) as any;
         console.log("getListingById response:", data);
         const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
         const imageSrc =

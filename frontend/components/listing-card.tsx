@@ -24,6 +24,10 @@ export function ListingCard({ listing }: { listing: Listing }) {
     });
   } catch (e) {}
 
+  if (!imageSrc || imageSrc === "") {
+    console.error("Missing image source", listing);
+  }
+
   return (
     <Link
       className="group w-full h-full rounded-xl bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1"
@@ -31,7 +35,6 @@ export function ListingCard({ listing }: { listing: Listing }) {
     >
       <div className="flex h-full flex-col">
         <div className="relative h-48 w-full overflow-hidden rounded-lg">
-          {(!imageSrc || imageSrc === "") && console.error("Missing image source", listing)}
           <Image
             alt={listing.title}
             className="object-cover transition duration-500 group-hover:scale-105"
