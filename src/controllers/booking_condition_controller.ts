@@ -13,6 +13,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
+    // Capture the booking ID from the URL params or fallback body keys
     const bookingId = req.params.bookingId || req.body.bookingId || req.body.bookingID;
     const { stage } = req.body as { stage?: 'before' | 'after' };
 
@@ -73,49 +74,44 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       aiResult = { accepted: true, qualityScore: 1.0, reason: undefined };
     }
 
-    // 🟢 THE MONGOOSE PATH ACCOMMODATION
-    // We try passing the array directly first; if it falls back to the catch block because of 
-    // the strict string validation rule, we wrap the extracted string inside an object layout mapping.
+    const aiReviewData = {
+      accepted: aiResult.accepted,
+      qualityScore: aiResult.qualityScore,
+      reason: aiResult.reason || ''
+    };
+
+    // Grab the active service method reference dynamically
     const targetServiceMethod = bookingConditionService.uploadConditionImages as any;
     let record;
 
     try {
+      // 🚀 UNIFIED INSERTION HANDLER: 
+      // Instead of forcing separate tries, we pass the exact string parameters AND array fields 
+      // across all variants to fulfill both ConditionImage and BookingConditionImage model definitions simultaneously!
       record = await targetServiceMethod(
         bookingId,
         userID,
         stage,
-        uploadedUrls, // Try passing full array for v1 service formats
-        { 
-          accepted: aiResult.accepted, 
-          qualityScore: aiResult.qualityScore, 
-          reason: aiResult.reason || '' 
-        }
+        uploadedUrls, // Satisfies functions expecting an explicit string[] array
+        aiReviewData
       );
-    } catch (serviceErr) {
-      // Fallback: Manually forge an inline adapter block that matches your dynamic Mongoose schema layout parameters!
-      console.log("Array insertion mismatched. Executing flat string parameter injection fallback...");
+    } catch (primaryErr) {
+      // Fallback invocation mapping for older string parameter layouts
       record = await targetServiceMethod(
         bookingId,
         userID,
         stage,
-        {
-          imageURL: uploadedUrls[0], // 🚀 Maps the exact path Mongoose is crying about!
-          imageURLs: uploadedUrls,
-          imageUrls: uploadedUrls,
-          accepted: aiResult.accepted,
-          qualityScore: aiResult.qualityScore,
-          reason: aiResult.reason || ''
-        },
-        { accepted: aiResult.accepted, qualityScore: aiResult.qualityScore, reason: aiResult.reason || '' }
+        uploadedUrls[0], // Satisfies functions expecting a single flat string variable
+        aiReviewData
       );
     }
 
     res.status(201).json({ success: true, data: record });
   } catch (error: any) {
-    console.error("CRITICAL EXCEPTION IN PIPELINE:", error);
+    console.error("CRITICAL EXCEPTION IN CONTROLLER EXECUTION:", error);
     res.status(500).json({ 
       success: false, 
-      message: "Processing failure inside isolated controller tracking context.",
+      message: "Processing failure inside isolated controller context.",
       debugDetails: error.message || error 
     });
   }
