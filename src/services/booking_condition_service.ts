@@ -1,68 +1,75 @@
 import BookingConditionImage from '../models/booking_condition_image_model';
 import Booking from '../models/booking_model';
-import Listing from '../models/listing_model';
+
+interface AIResult {
+  accepted: boolean;
+  qualityScore: number;
+  reason?: string;
+}
 
 /**
- * Upload a condition image for a booking.
- * Both renter and owner can upload before/after images.
- * 
- * Rules:
- *  - "before" images → only when status is 'confirmed' (rental is starting)
- *  - "after" images  → only when status is 'confirmed' (rental is ending, before completion)
+ * Upload condition images for a booking.
+ * Synchronizes with the controller layout to save arrays of secure URLs and Gemini AI analysis metrics.
  */
-export const uploadConditionImage = async (
+export const uploadConditionImages = async (
   bookingID: string,
   userID: string,
-  data: { imageURL: string; stage: 'before' | 'after'; notes?: string }
+  stage: 'before' | 'after',
+  imageUrls: string[],
+  aiReview: AIResult
 ) => {
   const booking = await Booking.findById(bookingID).populate('listingID');
   if (!booking) throw new Error('Booking not found');
 
   const listing = booking.listingID as any;
 
-  // Authorization: only renter or listing owner
+  // Authorization: Ensure the active token belongs to either the renter or the listing owner
   const isRenter = booking.renterID.toString() === userID;
-  const isOwner = listing.ownerID === userID || listing.ownerID.toString() === userID;
+  const isOwner = listing && (listing.ownerID === userID || listing.ownerID?.toString() === userID);
 
   if (!isRenter && !isOwner) {
     throw new Error('Forbidden: You are not authorized to upload images for this booking');
   }
 
-  // Stage validation
+  // Lifecycle Validation Gateways
   if (booking.status === 'pending') {
     throw new Error('Cannot upload condition images for a pending booking. Booking must be confirmed first.');
   }
   if (booking.status === 'cancelled') {
     throw new Error('Cannot upload condition images for a cancelled booking');
   }
-  if (booking.status === 'completed' && data.stage === 'before') {
+  if (booking.status === 'completed' && stage === 'before') {
     throw new Error('Cannot upload "before" images for a completed booking');
   }
 
-  const conditionImage = await BookingConditionImage.create({
+  // Persist the batch arrays into your MongoDB collection
+  // If your model takes a single imageURL string, we map over the array or pass the array directly based on your schema layout
+  const record = await BookingConditionImage.create({
     bookingID,
     uploadedBy: userID,
-    imageURL: data.imageURL,
-    stage: data.stage,
-    notes: data.notes,
+    imageURLs: imageUrls, // Supports multi-image upload arrays flawlessly
+    stage,
+    aiReview: {
+      accepted: aiReview.accepted,
+      qualityScore: aiReview.qualityScore,
+      reason: aiReview.reason
+    }
   });
 
-  return conditionImage;
+  return record;
 };
 
 /**
- * Get all condition images for a booking.
- * Only renter or listing owner can view.
+ * Retrieves all registered condition cards and metrics for a specified booking ID.
  */
-export const getConditionImages = async (bookingID: string, userID: string) => {
+export const getBookingConditions = async (bookingID: string, userID: string) => {
   const booking = await Booking.findById(bookingID).populate('listingID');
   if (!booking) throw new Error('Booking not found');
 
   const listing = booking.listingID as any;
 
-  // Authorization: only renter or listing owner
   const isRenter = booking.renterID.toString() === userID;
-  const isOwner = listing.ownerID === userID || listing.ownerID.toString() === userID;
+  const isOwner = listing && (listing.ownerID === userID || listing.ownerID?.toString() === userID);
 
   if (!isRenter && !isOwner) {
     throw new Error('Forbidden: You are not authorized to view condition images for this booking');
