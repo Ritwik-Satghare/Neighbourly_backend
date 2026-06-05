@@ -7,20 +7,13 @@ const brevoApiKey = process.env.BREVO_API_KEY;
 const senderEmail = process.env.SENDER_EMAIL;
 const senderName = process.env.SENDER_NAME;
 
-if (!brevoApiKey) {
-  throw new Error("Missing required environment variable: BREVO_API_KEY");
-}
+let brevo: any = null;
 
-if (!senderEmail) {
-  throw new Error("Missing required environment variable: SENDER_EMAIL");
+if (!brevoApiKey || !senderEmail || !senderName) {
+  console.warn("⚠️ Missing required environment variables for Brevo (BREVO_API_KEY, SENDER_EMAIL, SENDER_NAME). Emails will be mocked.");
+} else {
+  brevo = new BrevoClient({ apiKey: brevoApiKey });
 }
-
-if (!senderName) {
-  throw new Error("Missing required environment variable: SENDER_NAME");
-}
-
-// Initialize the unified Brevo Client using the new SDK pattern
-const brevo = new BrevoClient({ apiKey: brevoApiKey });
 
 const sendEmail = async (
   to: string,
@@ -28,6 +21,11 @@ const sendEmail = async (
   text: string,
   html?: string
 ): Promise<void> => {
+  if (!brevo) {
+    console.log("[MOCK EMAIL] Would send to:", to, "| Subject:", subject);
+    return;
+  }
+
   try {
     console.log("Sending transactional email via Brevo:", {
       to,
@@ -36,11 +34,10 @@ const sendEmail = async (
       senderName,
     });
 
-    // Call through the correct transactionalEmails property namespace
     await brevo.transactionalEmails.sendTransacEmail({
       sender: {
-        email: senderEmail,
-        name: senderName,
+        email: senderEmail!,
+        name: senderName!,
       },
       to: [{ email: to }],
       subject,

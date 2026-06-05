@@ -64,6 +64,7 @@ import conversationRoutes from './routes/conversation_routes';
 import messageRoutes from './routes/message_routes';
 import reviewRoutes from './routes/review_routes';
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 import bookingConditionRoutes from './routes/booking_condition_routes';
 
 const app = express();
@@ -74,8 +75,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-// Look for your routes section in src/app.ts and update it to look like this:
 app.use('/auth', authRoutes);
+app.use('/user', userRoutes);
 app.use('/listing', listingRoutes);
 app.use('/offer', offerRoutes);
 app.use('/booking', bookingRoutes);
@@ -84,7 +85,7 @@ app.use('/payment', paymentRoutes);
 app.use('/conversation', conversationRoutes);
 app.use('/message', messageRoutes);
 app.use('/review', reviewRoutes);
-
+app.use('/booking_condition', bookingConditionRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
