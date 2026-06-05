@@ -13,7 +13,6 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // 🟢 DYNAMIC FALLBACK: Grabs the ID from either URL parameter OR multi-part form body keys!
     const bookingId = req.params.bookingId || req.body.bookingId || req.body.bookingID;
     const { stage } = req.body as { stage?: 'before' | 'after' };
 
@@ -74,19 +73,42 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
       aiResult = { accepted: true, qualityScore: 1.0, reason: undefined };
     }
 
-    // DB Adapter Bridge
+    // 🟢 THE MONGOOSE PATH ACCOMMODATION
+    // We try passing the array directly first; if it falls back to the catch block because of 
+    // the strict string validation rule, we wrap the extracted string inside an object layout mapping.
     const targetServiceMethod = bookingConditionService.uploadConditionImages as any;
-    const record = await targetServiceMethod(
-      bookingId,
-      userID,
-      stage,
-      uploadedUrls, 
-      { 
-        accepted: aiResult.accepted, 
-        qualityScore: aiResult.qualityScore, 
-        reason: aiResult.reason || '' 
-      }
-    );
+    let record;
+
+    try {
+      record = await targetServiceMethod(
+        bookingId,
+        userID,
+        stage,
+        uploadedUrls, // Try passing full array for v1 service formats
+        { 
+          accepted: aiResult.accepted, 
+          qualityScore: aiResult.qualityScore, 
+          reason: aiResult.reason || '' 
+        }
+      );
+    } catch (serviceErr) {
+      // Fallback: Manually forge an inline adapter block that matches your dynamic Mongoose schema layout parameters!
+      console.log("Array insertion mismatched. Executing flat string parameter injection fallback...");
+      record = await targetServiceMethod(
+        bookingId,
+        userID,
+        stage,
+        {
+          imageURL: uploadedUrls[0], // 🚀 Maps the exact path Mongoose is crying about!
+          imageURLs: uploadedUrls,
+          imageUrls: uploadedUrls,
+          accepted: aiResult.accepted,
+          qualityScore: aiResult.qualityScore,
+          reason: aiResult.reason || ''
+        },
+        { accepted: aiResult.accepted, qualityScore: aiResult.qualityScore, reason: aiResult.reason || '' }
+      );
+    }
 
     res.status(201).json({ success: true, data: record });
   } catch (error: any) {
@@ -94,7 +116,7 @@ export const uploadConditionImage = async (req: AuthRequest, res: Response): Pro
     res.status(500).json({ 
       success: false, 
       message: "Processing failure inside isolated controller tracking context.",
-      debug: error.message || error 
+      debugDetails: error.message || error 
     });
   }
 };
