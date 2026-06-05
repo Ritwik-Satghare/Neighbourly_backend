@@ -85,8 +85,6 @@ app.use('/conversation', conversationRoutes);
 app.use('/message', messageRoutes);
 app.use('/review', reviewRoutes);
 
-// FIX: Change the prefix from '/api/bookings' to '/booking' so it hits your proven routing tree seamlessly!
-app.use('/booking', bookingConditionRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
